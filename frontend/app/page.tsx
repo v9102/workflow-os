@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { TranscriptInput } from "@/components/TranscriptInput"
 import { AgentFeed } from "@/components/AgentFeed"
 import { ExecutionDashboard } from "@/components/ExecutionDashboard"
@@ -38,7 +38,6 @@ export default function Home() {
   const [activities, setActivities] = useState<AgentActivity[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"feed" | "dashboard">("feed")
 
   const processTranscript = async () => {
     if (!transcript.trim()) return
@@ -58,31 +57,48 @@ export default function Home() {
       setSessionId(data.transcript_id)
       setActivities(data.activities || [])
       setDashboardData(data.dashboard || null)
-      setIsProcessing(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
       setIsProcessing(false)
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          <TranscriptInput transcript={transcript} setTranscript={setTranscript} isProcessing={isProcessing} onProcess={processTranscript} error={error} />
+  const showResults = isProcessing || dashboardData
 
-          {(isProcessing || dashboardData) && (
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-1">
-                <AgentFeed activities={activities} isProcessing={isProcessing} activeTab={activeTab} setActiveTab={setActiveTab} />
-              </div>
-              <div className="lg:col-span-2">
-                {dashboardData && <ExecutionDashboard data={dashboardData} sessionId={sessionId || undefined} />}
-              </div>
-            </div>
-          )}
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+        <div className="max-w-2xl mx-auto mb-10 sm:mb-14 text-center">
+          <h2 className="text-2xl sm:text-3xl font-display font-semibold tracking-tight text-[var(--color-ink)]">
+            Transform transcripts into execution plans
+          </h2>
+          <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
+            Paste a meeting transcript and let the agent swarm extract actions, risks, and timelines.
+          </p>
         </div>
+
+        <div className="animate-fade-in">
+          <TranscriptInput
+            transcript={transcript}
+            setTranscript={setTranscript}
+            isProcessing={isProcessing}
+            onProcess={processTranscript}
+            error={error}
+          />
+        </div>
+
+        {showResults && (
+          <div className="mt-8 animate-slide-up">
+            <AgentFeed activities={activities} isProcessing={isProcessing} />
+            {dashboardData && (
+              <div className="mt-6 animate-slide-up">
+                <ExecutionDashboard data={dashboardData} sessionId={sessionId || undefined} />
+              </div>
+            )}
+          </div>
+        )}
       </main>
       <Footer />
     </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { FileText, Send, Loader2, AlertCircle } from "lucide-react"
-import { useRef } from "react"
+import { useRef, useState } from "react"
 
 interface TranscriptInputProps {
   transcript: string
@@ -35,6 +35,7 @@ Rakshit: Sounds good. I'll also set up the CI pipeline for the auth module by We
 
 export function TranscriptInput({ transcript, setTranscript, isProcessing, onProcess, error }: TranscriptInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [focused, setFocused] = useState(false)
 
   const handlePasteSample = () => {
     setTranscript(SAMPLE_TRANSCRIPT)
@@ -42,52 +43,82 @@ export function TranscriptInput({ transcript, setTranscript, isProcessing, onPro
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-          <FileText className="w-5 h-5 text-blue-500" />
+    <div
+      className="rounded-2xl border transition-all duration-300"
+      style={{
+        backgroundColor: "var(--color-surface)",
+        borderColor: focused ? "var(--color-accent)" : "var(--color-border)",
+        boxShadow: focused
+          ? "0 0 0 3px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0,0,0,0.04)"
+          : "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)",
+      }}
+    >
+      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+        <label className="text-sm font-medium flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
+          <FileText className="w-4 h-4" style={{ color: "var(--color-accent)" }} />
           Meeting Transcript
-        </h2>
+        </label>
         <button
           onClick={handlePasteSample}
           disabled={isProcessing}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+          className="text-xs font-medium transition-opacity disabled:opacity-40 hover:opacity-70"
+          style={{ color: "var(--color-accent)" }}
         >
-          Load Sample
+          + Load sample
         </button>
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); onProcess(); }}>
-        <textarea
-          ref={textareaRef}
-          value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
-          placeholder="Paste your meeting transcript here..."
-          rows={6}
-          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all"
-          disabled={isProcessing}
-        />
+      <form onSubmit={(e) => { e.preventDefault(); onProcess() }} className="px-5 pb-5">
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder="Paste your meeting transcript here…"
+            rows={7}
+            disabled={isProcessing}
+            className="w-full px-4 py-3.5 rounded-xl border text-sm resize-none transition-all duration-200 placeholder:select-none"
+            style={{
+              backgroundColor: "var(--color-panel)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-ink)",
+            }}
+          />
+        </div>
 
         {error && (
-          <div className="mt-4 flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <div className="mt-4 flex items-start gap-2.5 p-3.5 rounded-xl" style={{ backgroundColor: "var(--color-danger-light)", border: "1px solid rgba(244, 63, 94, 0.2)" }}>
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "var(--color-danger)" }} />
+            <p className="text-xs" style={{ color: "var(--color-danger-dark)" }}>{error}</p>
           </div>
         )}
 
         <button
           type="submit"
           disabled={isProcessing || !transcript.trim()}
-          className="mt-4 w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+          className="mt-4 w-full py-3 px-6 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+          style={{
+            backgroundColor: "var(--color-accent)",
+            color: "white",
+            opacity: isProcessing || !transcript.trim() ? 0.5 : 1,
+          }}
+          onMouseEnter={(e) => {
+            if (!isProcessing && transcript.trim()) e.currentTarget.style.opacity = "0.9"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = isProcessing || !transcript.trim() ? "0.5" : "1"
+          }}
         >
           {isProcessing ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Processing with Agent Swarm...
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Processing with agent swarm…
             </>
           ) : (
             <>
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4" />
               Process Transcript
             </>
           )}
