@@ -1,11 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { TranscriptInput } from "@/components/TranscriptInput"
 import { AgentFeed } from "@/components/AgentFeed"
 import { ExecutionDashboard } from "@/components/ExecutionDashboard"
 import { Header } from "@/components/Header"
 import { Footer } from "@/components/Footer"
+import { ToastContainer, toast } from "@/components/Toast"
+import { useSSE } from "@/hooks/useSSE"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 
 interface DashboardData {
   tasks: Array<{
@@ -27,6 +30,7 @@ interface AgentActivity {
   status: string
   message: string
   timestamp: string
+  elapsed_seconds?: number | null
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -38,6 +42,67 @@ export default function Home() {
   const [activities, setActivities] = useState<AgentActivity[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sseEnabled, setSseEnabled] = useState(false)
+
+  const fetchDashboard = useCallback(async (sid: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/dashboard/${sid}`)
+      if (!res.ok) return null
+      const data = await res.json()
+      setDashboardData(data.dashboard)
+      setActivities(data.activities || [])
+      return data
+    } catch {
+      return null
+    }
+  }, [])
+
+  const handleSSEActivity = useCallback((data: any) => {
+    setActivities((prev) => {
+      if (prev.some((a) => a.timestamp === data.timestamp)) return prev
+      return [...prev, data]
+    })
+  }, [])
+
+  const handleSSEDone = useCallback(async (status: string) => {
+    setIsProcessing(false)
+    setSseEnabled(false)
+    if (sessionId) {
+      await fetchDashboard(sessionId)
+    }
+    if (status === "completed") {
+      toast("success", "Pipeline complete", "All agents finished successfully")
+    } else {
+      toast("error", "Pipeline failed", "Check the agent feed for details")
+    }
+  }, [sessionId, fetchDashboard])
+
+  const handleSSETimeout = useCallback(() => {
+    setIsProcessing(false)
+    setSseEnabled(false)
+    toast("warning", "Pipeline timeout", "The agent pipeline took too long")
+  }, [])
+
+  const handleSSEError = useCallback((err: string) => {
+    toast("error", "Connection error", err)
+  }, [])
+
+  useSSE(sessionId, {
+    onActivity: handleSSEActivity,
+    onDone: handleSSEDone,
+    onTimeout: handleSSETimeout,
+    onError: handleSSEError,
+    enabled: sseEnabled,
+  })
+
+  const shortcuts = useMemo(() => ({
+    "Ctrl+Enter": () => {
+      if (!isProcessing && transcript.trim()) processTranscript()
+    },
+    "Ctrl+L": () => document.querySelector<HTMLTextAreaElement>("textarea")?.focus(),
+  }), [isProcessing, transcript])
+
+  useKeyboardShortcuts(shortcuts, !isProcessing)
 
   const processTranscript = async () => {
     if (!transcript.trim()) return
@@ -57,12 +122,17 @@ export default function Home() {
       setSessionId(data.transcript_id)
       setActivities(data.activities || [])
       setDashboardData(data.dashboard || null)
+      setSseEnabled(true)
+      toast("info", "Processing started", "Agent swarm is working on your transcript")
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
-    } finally {
-      setIsProcessing(false)
+      toast("error", "Processing failed", err instanceof Error ? err.message : "An error occurred")
     }
   }
+
+  useEffect(() => {
+    if (!isProcessing) setSseEnabled(false)
+  }, [isProcessing])
 
   const showResults = isProcessing || dashboardData
 
@@ -76,6 +146,8 @@ export default function Home() {
           </h2>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
             Paste a meeting transcript and let the agent swarm extract actions, risks, and timelines.
+            <br />
+            <kbd className="px-1.5 py-0.5 rounded text-2xs" style={{ backgroundColor: "var(--color-panel)", border: "1px solid var(--color-border)" }}>Ctrl+Enter</kbd> to submit
           </p>
         </div>
 
@@ -101,6 +173,7 @@ export default function Home() {
         )}
       </main>
       <Footer />
+      <ToastContainer />
     </div>
   )
 }

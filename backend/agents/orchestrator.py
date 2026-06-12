@@ -1,4 +1,5 @@
 import re
+import time
 import uuid
 from typing import Callable, Awaitable, List, Optional
 from ..schemas.models import (
@@ -29,9 +30,17 @@ class OrchestratorAgent:
         self.validator_agent = ValidatorAgent()
         self.activities: List[AgentActivity] = []
         self._activity_callback = activity_callback
+        self._start_times: dict[str, float] = {}
 
     async def _emit_activity(self, agent_name: str, status: AgentStatus, message: str):
-        activity = AgentActivity(agent_name=agent_name, status=status, message=message)
+        elapsed = None
+        if status == AgentStatus.RUNNING:
+            self._start_times[agent_name] = time.time()
+        elif status in (AgentStatus.COMPLETED, AgentStatus.FAILED):
+            start = self._start_times.pop(agent_name, None)
+            if start:
+                elapsed = round(time.time() - start, 2)
+        activity = AgentActivity(agent_name=agent_name, status=status, message=message, elapsed_seconds=elapsed)
         self.activities.append(activity)
         if self._activity_callback:
             await self._activity_callback(activity)
