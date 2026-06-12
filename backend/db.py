@@ -1,21 +1,28 @@
 import os
 from typing import Optional
-from azure.cosmos import CosmosClient, exceptions
+
+try:
+    from azure.cosmos import CosmosClient, exceptions
+    _HAS_COSMOS = True
+except ImportError:
+    _HAS_COSMOS = False
+    CosmosClient = None
+    exceptions = None
 
 _client: Optional[CosmosClient] = None
 _in_memory_store: dict[str, dict] = {}
 
 
-def _get_client() -> Optional[CosmosClient]:
+def _get_client() -> Optional["CosmosClient"]:
     global _client
-    if _client is None:
+    if _client is None and _HAS_COSMOS:
         conn = os.getenv("COSMOS_DB_CONNECTION_STRING")
         if conn:
             _client = CosmosClient.from_connection_string(conn)
     return _client
 
 
-_use_cosmos = lambda: bool(os.getenv("COSMOS_DB_CONNECTION_STRING"))
+_use_cosmos = lambda: bool(os.getenv("COSMOS_DB_CONNECTION_STRING")) and _HAS_COSMOS
 _db_name = lambda: os.getenv("COSMOS_DB_DATABASE", "workflowos")
 _container_name = lambda: os.getenv("COSMOS_DB_CONTAINER", "sessions")
 
@@ -45,6 +52,8 @@ async def get_session(session_id: str) -> Optional[dict]:
         try:
             return container.read_item(item=session_id, partition_key=session_id)
         except exceptions.CosmosResourceNotFoundError:
+            return None
+        except Exception:
             return None
     return _in_memory_store.get(session_id)
 

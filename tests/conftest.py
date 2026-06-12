@@ -1,10 +1,8 @@
 import pytest
-from unittest.mock import AsyncMock, patch
 from typing import List
 
 from backend.schemas.models import (
-    TaskItem, ExtractionResult, RiskAssessment, AssignmentResult,
-    RiskLevel, AgentActivity, AgentStatus
+    TaskItem, RiskLevel
 )
 
 
@@ -31,17 +29,3 @@ def sample_tasks() -> List[TaskItem]:
         TaskItem(id="2", task="Security review", deadline="Before launch",
                  dependencies=[], decision="Blocker"),
     ]
-
-
-@pytest.fixture
-def mock_openai():
-    """Mock Azure OpenAI chat completions for all agent tests."""
-    with patch("backend.agents.llm.get_client") as mock_get_client:
-        mock_client = AsyncMock()
-        mock_completion = AsyncMock()
-        mock_choice = AsyncMock()
-        mock_choice.message.content = '{"tasks": [], "decisions": []}'
-        mock_completion.choices = [mock_choice]
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_completion)
-        mock_get_client.return_value = mock_client
-        yield mock_get_client

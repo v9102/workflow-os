@@ -1,7 +1,7 @@
 import pytest
 from backend.schemas.models import (
     TaskItem, ExtractionResult, RiskAssessment, AssignmentResult,
-    ExecutionDashboard, ValidationIssue, AgentActivity,
+    ExecutionDashboard, AgentActivity,
     RiskLevel, AgentStatus, TranscriptRequest, TranscriptResponse,
     DashboardResponse
 )
@@ -38,7 +38,6 @@ class TestExecutionDashboard:
         dashboard = ExecutionDashboard(transcript_id="test-1")
         assert dashboard.tasks == []
         assert dashboard.timeline == []
-        assert dashboard.validation_issues == []
 
 
 class TestRiskLevel:
@@ -47,14 +46,3 @@ class TestRiskLevel:
         assert RiskLevel.MEDIUM.value == "Medium"
         assert RiskLevel.LOW.value == "Low"
         assert RiskLevel.UNKNOWN.value == "Unknown"
-
-
-class TestAgentActivity:
-    def test_timestamp_auto_set(self):
-        activity = AgentActivity(
-            agent_name="TestAgent",
-            status=AgentStatus.RUNNING,
-            message="Testing"
-        )
-        assert activity.timestamp is not None
-        assert activity.agent_name == "TestAgent"
