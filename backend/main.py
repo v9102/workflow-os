@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
@@ -26,9 +27,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="WorkflowOS API", version="1.0.0", lifespan=lifespan)
 
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
