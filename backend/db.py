@@ -22,9 +22,16 @@ def _get_client() -> Optional["CosmosClient"]:
     return _client
 
 
-_use_cosmos = lambda: bool(os.getenv("COSMOS_DB_CONNECTION_STRING")) and _HAS_COSMOS
-_db_name = lambda: os.getenv("COSMOS_DB_DATABASE", "workflowos")
-_container_name = lambda: os.getenv("COSMOS_DB_CONTAINER", "sessions")
+def _use_cosmos() -> bool:
+    return bool(os.getenv("COSMOS_DB_CONNECTION_STRING")) and _HAS_COSMOS
+
+
+def _db_name() -> str:
+    return os.getenv("COSMOS_DB_DATABASE", "workflowos")
+
+
+def _container_name() -> str:
+    return os.getenv("COSMOS_DB_CONTAINER", "sessions")
 
 
 def _container():

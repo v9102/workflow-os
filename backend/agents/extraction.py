@@ -1,11 +1,8 @@
 import json
-import os
-import logging
-from typing import List
-from openai import AzureOpenAI
+from typing import Optional
 from ..schemas.models import ExtractionResult, TaskItem
+from .llm import get_client, get_deployment
 
-logger = logging.getLogger("workflowos.extraction")
 
 EXTRACTION_PROMPT = """
 You are an expert at extracting actionable items from meeting transcripts.
@@ -78,9 +75,11 @@ class ExtractionAgent:
         for i, t in enumerate(result.get("tasks", [])):
             tasks.append(TaskItem(
                 id=str(i),
-                task=t.get("task", ""),
+                task=t["task"],
                 deadline=t.get("deadline"),
                 dependencies=t.get("dependencies", []),
-                decision=t.get("decision"),
-            ))
+                decision=t.get("decision")
+            )
+            for i, t in enumerate(result.get("tasks", []))
+        ]
         return ExtractionResult(tasks=tasks, decisions=result.get("decisions", []))

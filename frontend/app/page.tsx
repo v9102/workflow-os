@@ -18,9 +18,15 @@ interface DashboardData {
     decision: string | null
   }>
   summary: string
-  timeline: Array<{ task: string; deadline: string; owner: string; risk: string }>
-  validation_issues?: Array<{ task_id: string; issue_type: string; detail: string }>
+  timeline: Array<{
+    task: string
+    deadline: string
+    owner: string
+    risk: string
+  }>
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 interface AgentActivity {
   agent_name: string
@@ -29,8 +35,6 @@ interface AgentActivity {
   timestamp: string
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
 export default function Home() {
   const [transcript, setTranscript] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
@@ -38,25 +42,59 @@ export default function Home() {
   const [activities, setActivities] = useState<AgentActivity[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<"feed" | "dashboard">("feed")
+  const eventSourceRef = useRef<EventSource | null>(null)
 
   const processTranscript = async () => {
     if (!transcript.trim()) return
+
     setIsProcessing(true)
     setError(null)
     setDashboardData(null)
     setActivities([])
 
     try {
-      const res = await fetch(`${API_URL}/api/transcript/process`, {
+      const response = await fetch(`${API_URL}/api/transcript/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript }),
       })
-      if (!res.ok) throw new Error("Failed to process")
-      const data = await res.json()
+
+      if (!response.ok) {
+        throw new Error("Failed to process transcript")
+      }
+
+      const data = await response.json()
       setSessionId(data.transcript_id)
-      setActivities(data.activities || [])
-      setDashboardData(data.dashboard || null)
+
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+
+      eventSourceRef.current = new EventSource(`${API_URL}/api/activities/${data.transcript_id}/stream`)
+
+      eventSourceRef.current.onmessage = (event) => {
+        const payload = JSON.parse(event.data)
+
+        if (payload.event === "done") {
+          eventSourceRef.current?.close()
+          fetchDashboard(data.transcript_id)
+          return
+        }
+
+        setActivities(prev => [...prev, payload])
+
+        if (payload.agent_name === "Orchestrator" && payload.status === "completed") {
+          eventSourceRef.current?.close()
+          fetchDashboard(data.transcript_id)
+        }
+      }
+
+      eventSourceRef.current.onerror = () => {
+        eventSourceRef.current?.close()
+        fetchDashboard(data.transcript_id)
+      }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -100,6 +138,7 @@ export default function Home() {
           </div>
         )}
       </main>
+
       <Footer />
     </div>
   )

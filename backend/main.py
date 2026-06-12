@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -10,8 +11,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 from .schemas.models import (
-    TranscriptRequest, TranscriptResponse, DashboardResponse,
-    ExecutionDashboard, AgentActivity, AgentStatus
+    TranscriptResponse, DashboardResponse, AgentActivity, ExecutionDashboard
 )
 from .agents.orchestrator import OrchestratorAgent
 from . import db
@@ -19,7 +19,7 @@ from .m365 import graph_client
 
 load_dotenv()
 
-orchestrator = OrchestratorAgent()
+
 active_sessions: dict = {}
 
 
@@ -32,9 +32,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="WorkflowOS API", version="1.0.0", lifespan=lifespan)
 
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,45 +50,84 @@ class ProcessRequest(BaseModel):
     meeting_id: Optional[str] = None
 
 
-class ActivityUpdate(BaseModel):
-    session_id: str
-    activities: List[AgentActivity]
+def _serialize_session(session: dict) -> dict:
+    return {
+        "status": session["status"],
+        "error": session["error"],
+        "dashboard": session["dashboard"].model_dump(mode="json") if session["dashboard"] else None,
+        "activities": [a.model_dump(mode="json") for a in session["activities"]],
+    }
+
+
+async def _load_session(session_id: str) -> Optional[dict]:
+    session = active_sessions.get(session_id)
+    if session:
+        return session
+    stored = await db.get_session(session_id)
+    if not stored:
+        return None
+    return {
+        "status": stored.get("status"),
+        "error": stored.get("error"),
+        "dashboard": ExecutionDashboard(**stored["dashboard"]) if stored.get("dashboard") else None,
+        "activities": [AgentActivity(**a) for a in stored.get("activities", [])],
+        "queue": None,
+    }
+
+
+async def _run_pipeline(session_id: str, transcript: str):
+    session = active_sessions[session_id]
+
+    async def activity_callback(activity: AgentActivity):
+        session["activities"].append(activity)
+        await session["queue"].put(activity)
+
+    orchestrator = OrchestratorAgent(activity_callback=activity_callback)
+    try:
+        dashboard = await orchestrator.process_transcript(transcript, session_id)
+        session["dashboard"] = dashboard
+        session["status"] = "completed"
+    except Exception as e:
+        session["status"] = "failed"
+        session["error"] = str(e)
+    finally:
+        await db.save_session(session_id, _serialize_session(session))
+        await session["queue"].put(None)
 
 
 @app.post("/api/transcript/process", response_model=TranscriptResponse)
 async def process_transcript(request: ProcessRequest):
+    if not request.transcript.strip():
+        raise HTTPException(status_code=422, detail="Transcript is empty")
+
     session_id = request.meeting_id or str(uuid.uuid4())[:8]
-    session = {"status": "processing", "dashboard": None, "activities": []}
-    active_sessions[session_id] = session
-    await db.save_session(session_id, session)
+    active_sessions[session_id] = {
+        "status": "processing",
+        "dashboard": None,
+        "activities": [],
+        "error": None,
+        "queue": asyncio.Queue(),
+    }
 
-    async def activity_callback(activity: AgentActivity):
-        active_sessions[session_id]["activities"].append(activity)
-        await db.save_session(session_id, active_sessions[session_id])
+    asyncio.create_task(_run_pipeline(session_id, request.transcript))
 
-    orchestrator.set_activity_callback(activity_callback)
-
-    try:
-        dashboard = await orchestrator.process_transcript(request.transcript, session_id)
-        session["status"] = "completed"
-        session["dashboard"] = dashboard
-        await db.save_session(session_id, session)
-        return TranscriptResponse(
-            transcript_id=session_id,
-            status="completed",
-            message="Transcript processed successfully"
-        )
-    except Exception as e:
-        session["status"] = "failed"
-        await db.save_session(session_id, session)
-        raise HTTPException(status_code=500, detail=str(e))
+    return TranscriptResponse(
+        transcript_id=session_id,
+        status="processing",
+        message="Transcript processing started"
+    )
 
 
 @app.get("/api/dashboard/{session_id}", response_model=DashboardResponse)
 async def get_dashboard(session_id: str):
-    session = await db.get_session(session_id) or active_sessions.get(session_id)
-    if not session:
+    session = await _load_session(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    if session["status"] == "failed":
+        raise HTTPException(status_code=500, detail=session["error"] or "Processing failed")
+    if session["dashboard"] is None:
+        raise HTTPException(status_code=409, detail="Processing not complete")
     return DashboardResponse(
         dashboard=session["dashboard"],
         activities=session["activities"]
@@ -93,36 +136,29 @@ async def get_dashboard(session_id: str):
 
 @app.get("/api/activities/{session_id}", response_model=List[AgentActivity])
 async def get_activities(session_id: str):
-    session = await db.get_session(session_id) or active_sessions.get(session_id)
-    if not session:
+    session = await _load_session(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return session["activities"]
 
 
 @app.get("/api/activities/{session_id}/stream")
 async def stream_activities(session_id: str):
-    session = await db.get_session(session_id) or active_sessions.get(session_id)
-    if not session:
+    session = await _load_session(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
     async def event_generator():
-        for activity in session.get("activities", []):
+        for activity in session["activities"]:
             yield f"data: {activity.model_dump_json()}\n\n"
-        if session.get("status") == "completed":
-            yield f"data: {json.dumps({'event': 'done', 'status': 'completed'})}\n\n"
+        if session["status"] != "processing" or session["queue"] is None:
             return
         while True:
-            await asyncio.sleep(0.5)
-            current = await db.get_session(session_id) or active_sessions.get(session_id, {})
-            new_count = len(current.get("activities", []))
-            old_count = len(session.get("activities", []))
-            if new_count > old_count:
-                for activity in current["activities"][old_count:]:
-                    yield f"data: {activity.model_dump_json()}\n\n"
-                session["activities"] = current["activities"]
-            if current.get("status") in ("completed", "failed"):
-                yield f"data: {json.dumps({'event': 'done', 'status': current['status']})}\n\n"
+            activity = await session["queue"].get()
+            if activity is None:
                 break
+            yield f"data: {activity.model_dump_json()}\n\n"
+        yield f"data: {json.dumps({'event': 'done', 'status': session['status']})}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -133,10 +169,10 @@ async def stream_activities(session_id: str):
 
 @app.get("/api/status/{session_id}")
 async def get_status(session_id: str):
-    session = await db.get_session(session_id) or active_sessions.get(session_id)
-    if not session:
+    session = await _load_session(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "status": session["status"]}
+    return {"session_id": session_id, "status": session["status"], "error": session["error"]}
 
 
 class ExportToPlannerRequest(BaseModel):
@@ -151,14 +187,19 @@ class ExportToTeamsRequest(BaseModel):
     channel_id: str
 
 
-@app.post("/api/export/planner")
-async def export_to_planner(request: ExportToPlannerRequest):
-    session = await db.get_session(request.session_id) or active_sessions.get(request.session_id)
-    if not session:
+async def _get_ready_dashboard(session_id: str) -> ExecutionDashboard:
+    session = await _load_session(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
     dashboard = session.get("dashboard")
     if not dashboard:
         raise HTTPException(status_code=409, detail="Dashboard not ready")
+    return dashboard
+
+
+@app.post("/api/export/planner")
+async def export_to_planner(request: ExportToPlannerRequest):
+    dashboard = await _get_ready_dashboard(request.session_id)
     results = []
     for task in dashboard.tasks:
         result = await graph_client.push_to_planner(
@@ -172,18 +213,12 @@ async def export_to_planner(request: ExportToPlannerRequest):
 
 @app.post("/api/export/teams")
 async def export_to_teams(request: ExportToTeamsRequest):
-    session = await db.get_session(request.session_id) or active_sessions.get(request.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    dashboard = session.get("dashboard")
-    if not dashboard:
-        raise HTTPException(status_code=409, detail="Dashboard not ready")
-    summary = dashboard.summary
+    dashboard = await _get_ready_dashboard(request.session_id)
     task_list = "\n".join(
         f"- [{t.risk.value}] {t.task} ({t.owner or 'Unassigned'})"
         for t in dashboard.tasks
     )
-    message = f"## WorkflowOS Summary\n\n{summary}\n\n### Tasks\n{task_list}"
+    message = f"## WorkflowOS Summary\n\n{dashboard.summary}\n\n### Tasks\n{task_list}"
     await graph_client.send_teams_message(
         team_id=request.team_id,
         channel_id=request.channel_id,

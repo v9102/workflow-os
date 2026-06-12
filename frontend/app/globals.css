@@ -38,26 +38,36 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  ::selection {
-    background-color: var(--color-accent);
-    color: white;
-  }
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--background-start-rgb)),
+    rgb(var(--background-end-rgb))
+  );
+  min-height: 100vh;
+}
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
+}
 
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 9999px;
-  }
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-ink-muted);
-  }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
 }

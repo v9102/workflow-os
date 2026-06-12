@@ -1,9 +1,7 @@
 import json
-import os
 from typing import List
-from datetime import datetime
-from openai import AzureOpenAI
-from ..schemas.models import TaskItem, ExecutionDashboard, RiskLevel
+from ..schemas.models import TaskItem, ExecutionDashboard
+from .llm import get_client, get_deployment
 
 
 REPORTING_PROMPT = """
@@ -24,18 +22,8 @@ Include risk level for each task.
 
 class ReportingAgent:
     def __init__(self):
-        self._client = None
-        self._deployment = None
-
-    def _ensure_client(self):
-        if self._client is not None:
-            return
-        self._client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY", "placeholder"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "")
-        )
-        self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self.client = get_client()
+        self.deployment = get_deployment()
 
     async def generate_dashboard(
         self,
@@ -49,20 +37,20 @@ class ReportingAgent:
             for t in tasks
         ]
 
-        prompt = f"{REPORTING_PROMPT}\n\nTranscript:\n{transcript[:3000]}\n\nTasks:\n" + "\n".join(task_summaries)
+        user_prompt = f"Transcript:\n{transcript[:3000]}\n\nTasks:\n" + "\n".join(task_summaries)
 
-        response = self._client.chat.completions.create(
-            model=self._deployment,
+        response = await self.client.chat.completions.create(
+            model=self.deployment,
             messages=[
                 {"role": "system", "content": REPORTING_PROMPT},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": user_prompt}
             ],
             temperature=0.2,
             response_format={"type": "json_object"}
         )
 
         result = json.loads(response.choices[0].message.content)
-        
+
         return ExecutionDashboard(
             transcript_id=transcript_id,
             tasks=tasks,

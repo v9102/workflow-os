@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from typing import Optional, Callable, Awaitable, TypeVar
+from typing import Callable, Awaitable, TypeVar
 
 T = TypeVar("T")
 
