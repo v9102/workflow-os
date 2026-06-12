@@ -1,0 +1,95 @@
+WorkflowOS — AI Operating System for Teams
+Microsoft Build AI Hackathon 2026 · Agent Swarms Track
+=====================================================
+
+PROJECT OVERVIEW
+----------------
+Convert any meeting transcript into a structured, actionable team plan using
+a swarm of 5 specialized AI agents orchestrated dynamically. Agents run in a
+flexible DAG (not a fixed pipeline) with feedback loops, parallel validation,
+and cross-meeting memory. Each agent can request reprocessing from upstream
+agents, and the Orchestrator dynamically re-routes based on input complexity.
+No manual triage. No missed follow-ups. Just execution-ready output.
+
+STACK
+-----
+Frontend:      Next.js on Azure Static Web Apps
+Backend:       Python FastAPI (5 containerized agent services)
+Orchestration: Azure AI Foundry
+LLM:           Azure OpenAI GPT-4o
+Infra:         Azure Container Apps + Docker
+State:         Azure Cosmos DB + Redis Cache
+
+ACTIONABLE BUILD STEPS
+----------------------
+
+[1] Scaffold Repo & Container Structure
+    - Create monorepo with directories:
+      agents/extraction/
+      agents/risk/
+      agents/assignment/
+      agents/reporting/
+      agents/orchestrator/
+      frontend/
+    - Each agent: Python FastAPI service with Dockerfile
+    - Root docker-compose.yml for local dev
+
+[2] Define JSON Schemas (Agent Contracts)
+    - Pydantic models for each data shape:
+      TranscriptInput, TaskGraph, ActionItems, RiskScoredTasks,
+      OwnerMappedTasks, FinalDashboard
+    - These are the contracts between agents — get them right first
+
+[3] Build Extraction Agent (first in pipeline)
+    - Input: raw transcript text
+    - Output: structured action items
+    - Extract action verbs, owner nouns, deadlines, decisions via GPT-4o
+    - Support text input first; audio/video later
+
+[4] Build Risk Agent
+    - Input: action items from Extraction Agent
+    - Output: risk-scored tasks (High / Med / Low)
+    - Score using: deadline proximity + dependency count + speaker emphasis
+
+[5] Build Assignment Agent
+    - Input: risk-scored tasks
+    - Output: owner-mapped tasks
+    - Map using: name mention frequency + domain keywords + past ownership signals
+
+[6] Build Reporting Agent
+    - Input: owner-mapped tasks
+    - Output: unified dashboard payload
+    - Includes: task table, timeline, risk heatmap
+
+[7] Build Orchestrator Agent
+    - Input: raw transcript
+    - Manages lifecycle: parse → route to agents in sequence → retries → output
+    - Shared state via Redis (dev) / Cosmos DB (prod)
+    - Full traceability of each agent step
+
+[8] Build Frontend (Next.js)
+    - Transcript input (paste text or upload)
+    - Live agent feed — watch all 5 agents process in real time
+    - Final dashboard: tasks with owners, risk scores, dependencies, shared timeline
+    - Microsoft 365 Integration: push to Planner, notify via Teams, export to Outlook
+
+[9] Deploy
+    - Agent containers → Azure Container Apps
+    - Frontend → Azure Static Web Apps
+    - LLM → Azure OpenAI GPT-4o
+    - State → Azure Cosmos DB + Redis
+
+[10] Demo Polish
+    - Record 2-min demo: paste transcript → watch agents → final dashboard
+    - Show before/after of meeting follow-through
+    - Highlight swarm architecture as the differentiator
+
+MVP SHORTCUT
+------------
+Build agents 1 (Extraction), 3 (Risk), 4 (Assignment), 5 (Reporting),
+and 7 (Orchestrator) locally with FastAPI + GPT-4o.
+Skip Cosmos DB initially — use in-memory state.
+Orchestration + Extraction + Reporting is the core differentiator.
+
+---
+Generated for Microsoft Build AI Hackathon 2026 · Agent Swarms Track
