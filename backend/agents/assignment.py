@@ -4,7 +4,6 @@ import re
 from typing import List
 from openai import AzureOpenAI
 from ..schemas.models import TaskItem, AssignmentResult
-from .llm import get_client, get_deployment
 
 
 ASSIGNMENT_PROMPT = """

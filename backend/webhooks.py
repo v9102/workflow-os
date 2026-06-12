@@ -3,7 +3,6 @@ import json
 import hmac
 import hashlib
 import logging
-from typing import Optional
 from httpx import AsyncClient
 
 logger = logging.getLogger("workflowos")

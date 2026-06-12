@@ -1,9 +1,12 @@
 import json
+import logging
 import os
-from typing import Optional
+
 from openai import AzureOpenAI
+
 from ..schemas.models import ExtractionResult, TaskItem
-from .llm import get_client, get_deployment
+
+logger = logging.getLogger(__name__)
 
 
 EXTRACTION_PROMPT = """
@@ -80,9 +83,10 @@ class ExtractionAgent:
         for i, t in enumerate(result.get("tasks", [])):
             tasks.append(TaskItem(
                 id=str(i),
-                task=t["task"],
+                task=t.get("task", ""),
                 deadline=t.get("deadline"),
                 dependencies=t.get("dependencies", []),
-                decision=t.get("decision")
+                decision=t.get("decision"),
             ))
+
         return ExtractionResult(tasks=tasks, decisions=result.get("decisions", []))

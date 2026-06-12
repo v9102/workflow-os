@@ -3,7 +3,6 @@ import os
 from typing import List
 from openai import AzureOpenAI
 from ..schemas.models import TaskItem, RiskAssessment, RiskLevel
-from .llm import get_client, get_deployment
 
 
 RISK_PROMPT = """

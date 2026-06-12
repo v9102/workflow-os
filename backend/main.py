@@ -4,7 +4,7 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ from typing import List, Optional
 
 from .schemas.models import (
     TranscriptResponse, DashboardResponse, AgentActivity, ExecutionDashboard,
-    AuditEntry, RetryRequest, SCHEMA_VERSION
+    RetryRequest, SCHEMA_VERSION
 )
 from .agents.orchestrator import OrchestratorAgent
 from . import db
@@ -287,8 +287,8 @@ async def export_to_teams(request: ExportToTeamsRequest):
 @app.post("/api/export/pdf")
 async def export_to_pdf(request: ExportToPdfRequest):
     dashboard = await _get_ready_dashboard(request.session_id)
-    lines = [f"# WorkflowOS Report", f"Session: {request.session_id}", "",
-             f"## Summary", dashboard.summary, "",
+    lines = ["# WorkflowOS Report", f"Session: {request.session_id}", "",
+             "## Summary", dashboard.summary, "",
              "## Tasks", "| Task | Owner | Deadline | Risk | Dependencies |",
              "|------|-------|----------|------|-------------|"]
     for t in dashboard.tasks:

@@ -41,11 +41,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to Azure Container Apps
+      - name: Deploy backend to Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
           imageToDeploy: ${{ secrets.ACR_REGISTRY }}/workflowos-backend:latest
           containerAppName: workflowos-backend
+          resourceGroup: workflowos-rg
+          registryUrl: ${{ secrets.ACR_REGISTRY }}
+          registryUsername: ${{ secrets.ACR_USERNAME }}
+          registryPassword: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Deploy frontend to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          imageToDeploy: ${{ secrets.ACR_REGISTRY }}/workflowos-frontend:latest
+          containerAppName: workflowos-frontend
           resourceGroup: workflowos-rg
           registryUrl: ${{ secrets.ACR_REGISTRY }}
           registryUsername: ${{ secrets.ACR_USERNAME }}

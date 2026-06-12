@@ -3,28 +3,28 @@
 > **AI Operating System for Teams** — Transform meeting transcripts into actionable execution plans using a swarm of AI agents.
 
 [![CI](https://github.com/v9102/workflow-os/actions/workflows/ci.yml/badge.svg)](https://github.com/v9102/workflow-os/actions/workflows/ci.yml)
+[![Deploy](https://github.com/v9102/workflow-os/actions/workflows/deploy.yml/badge.svg)](https://github.com/v9102/workflow-os/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue)
 ![Next.js 14](https://img.shields.io/badge/Next.js-14-black)
-![Progress](https://img.shields.io/badge/Progress-100%25-brightgreen)
+![Status](https://img.shields.io/badge/Status-Production Ready-brightgreen)
 
 ```
-Transcript → [Extraction → Risk → Assignment → Reporting] → Dashboard → Planner/Teams
+Transcript → [Extraction → Risk → Assignment → Reporting → Validation] → Dashboard → Planner/Teams
 ```
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
+- [Project Overview](#project-overview)
+- [What Problem Does It Solve?](#what-problem-does-it-solve)
+- [Current Stage](#current-stage)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Local Setup](#local-setup)
-  - [Backend](#backend)
-  - [Frontend](#frontend)
-  - [Docker](#docker)
 - [Configuration](#configuration)
 - [Testing](#testing)
 - [API Reference](#api-reference)
@@ -35,7 +35,7 @@ Transcript → [Extraction → Risk → Assignment → Reporting] → Dashboard 
 
 ---
 
-## Overview
+## Project Overview
 
 WorkflowOS converts any meeting transcript into a structured, actionable team plan automatically. A swarm of 5 specialized AI agents processes the input in sequence, each adding a layer of intelligence before delivering a unified dashboard with tasks, owners, risk scores, dependencies, and a shared timeline.
 
@@ -43,17 +43,62 @@ WorkflowOS converts any meeting transcript into a structured, actionable team pl
 
 Built for the **Microsoft Build AI Hackathon 2026** — Agent Swarms Track.
 
+### What Problem Does It Solve?
+
+Teams waste countless hours manually converting meeting notes into structured action items, tracking deadlines, assigning owners, and monitoring risks. WorkflowOS eliminates this overhead by:
+
+- **Automating task extraction** from natural-language meeting transcripts
+- **Identifying owners** and deadlines automatically using AI context analysis
+- **Flagging risks** across tasks and dependencies in real time
+- **Generating execution dashboards** with timelines, heatmaps, and dependency graphs
+- **Integrating with Microsoft 365** to push tasks directly to Planner and Teams
+
+---
+
+## Current Stage
+
+**Production Ready — All 47 Features Implemented**
+
+| Category | Status |
+|----------|--------|
+| Agent Pipeline (Extraction → Risk → Assignment → Reporting → Validation) | ✅ Complete |
+| Real-time SSE Agent Feed | ✅ Complete |
+| Execution Dashboard (Tasks, Timeline, Risk Heatmap, Dependencies) | ✅ Complete |
+| Dark Mode & Theme System | ✅ Complete |
+| Preset Transcripts for Quick Demo | ✅ Complete |
+| History & Local Storage Persistence | ✅ Complete |
+| Microsoft 365 Integration (Planner, Teams) | ✅ Complete |
+| Cosmos DB Session Persistence | ✅ Complete |
+| Redis Caching | ✅ Complete |
+| Service Bus Feedback Queue | ✅ Complete |
+| Webhook Notifications | ✅ Complete |
+| Audit Logging | ✅ Complete |
+| Rate Limiting Middleware | ✅ Complete |
+| Docker Compose Local Dev | ✅ Complete |
+| Azure Container Apps Deployment | ✅ Complete |
+| GitHub Actions CI/CD | ✅ Complete |
+| Bicep Infrastructure as Code | ✅ Complete |
+| Input Validation & Sanitization | ✅ Complete |
+| Retry & Error Recovery | ✅ Complete |
+| Feedback Loops Between Agents | ✅ Complete |
+
+See [FINAL_SUMMARY.md](./FINAL_SUMMARY.md) and [DEMO_WALKTHROUGH.md](./DEMO_WALKTHROUGH.md) for detailed progress tracking.
+
 ---
 
 ## Features
 
-- **5-Agent Swarm:** Extraction → Risk → Assignment → Reporting → Validation with feedback loops
-- **Live Agent Feed:** Watch all 5 agents process in real time
-- **Execution Dashboard:** Task table, risk heatmap, Gantt-style timeline
+- **5-Agent Swarm:** Extraction → Risk → Assignment → Reporting → Validation with feedback loops and correction passes
+- **Live Agent Feed:** Watch all 5 agents process in real time via Server-Sent Events
+- **Execution Dashboard:** Task table with search, risk heatmap, dependency graph, and operational timeline
 - **Microsoft 365 Integration:** Push to Planner, share to Teams, export as Markdown
-- **Feedback Loops:** Agents can request reprocessing from upstream agents via the orchestrator
+- **Feedback Loops:** Agents can request reprocessing from upstream agents via the orchestrator (e.g., Assignment triggers Extraction to re-scan for missing deadlines)
 - **Dynamic DAG:** Pipeline adapts based on transcript length and speaker count
-- **Persistent State:** Cosmos DB-backed session memory with Redis caching
+- **Dark Mode:** Full theme support with persistent preference
+- **Design System:** Warm, editorial aesthetic with Playfair Display typography and monochrome palette
+- **Persistent State:** Cosmos DB-backed session memory with in-memory fallback
+- **Audit Logging:** Full audit trail for every pipeline execution
+- **Rate Limiting:** Configurable per-minute rate limiting
 - **Containerized:** Docker Compose for local dev, Azure Container Apps for production
 
 ---
@@ -69,6 +114,7 @@ Built for the **Microsoft Build AI Hackathon 2026** — Agent Swarms Track.
 | **Risk** | Score tasks High/Med/Low by urgency and dependencies | Task graph | Risk-scored tasks |
 | **Assignment** | Map tasks to team members by context | Risk-scored tasks | Owner-mapped tasks |
 | **Reporting** | Generate dashboard payload with timeline and summary | Owner-mapped tasks | Dashboard payload |
+| **Validator** | Cross-check owners, deadlines, risk scores | Dashboard | Validation issues |
 
 ### Swarm Dynamics
 
@@ -80,7 +126,7 @@ Built for the **Microsoft Build AI Hackathon 2026** — Agent Swarms Track.
                        │         │         │         │
                        ▼         ▼         ▼         ▼
                  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-                 │Extraction│ │  Risk   │ │Assignment│ │Reporting│
+                 │Extraction│ │  Risk   │ │Assignment│ │  Valid. │
                  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘
                       │            │            │            │
                       └──────┬─────┴────────────┴────────────┘
@@ -98,9 +144,12 @@ Feedback loops allow agents to request reprocessing (e.g., Assignment signals Ex
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Backend** | Python FastAPI | Async agent runtime |
+| **Backend** | Python FastAPI + Uvicorn | Async agent runtime |
 | **LLM** | Azure OpenAI GPT-4o | Powers all 5 agents |
-| **Frontend** | Next.js 14 + Tailwind CSS | Real-time dashboard |
+| **Frontend** | Next.js 14 + Tailwind CSS | Real-time dashboard with dark mode |
+| **Design** | Playfair Display + Inter | Editorial typography system |
+| **Animation** | Motion (Framer Motion) | Smooth UI transitions |
+| **Icons** | Lucide React | Consistent iconography |
 | **Database** | Azure Cosmos DB | Swarm memory, session persistence |
 | **Cache** | Redis | Response caching, rate limiting |
 | **Queue** | Azure Service Bus | Async feedback between agents |
@@ -199,15 +248,12 @@ All configuration is via environment variables in `backend/.env`:
 # From the project root
 python -m pytest tests/ -v
 
-# Run with coverage (if installed)
+# Run with coverage
 pip install pytest-cov
 python -m pytest tests/ --cov=backend -v
 ```
 
-The test suite includes:
-- **Schema validation tests** — Pydantic model defaults, enums, and serialization
-- **Database tests** — In-memory session persistence (save, get, delete, update)
-- **API tests** — Health check, input validation (requires running backend)
+The test suite includes schema validation, database persistence, and API endpoint tests.
 
 ---
 
@@ -242,7 +288,9 @@ workflowos/
 │   │   ├── risk.py             # Risk Agent — score tasks High/Med/Low
 │   │   ├── assignment.py       # Assignment Agent — map tasks to owners
 │   │   ├── reporting.py        # Reporting Agent — generate dashboard
-│   │   └── orchestrator.py     # Orchestrator — lifecycle, retry, routing
+│   │   ├── validator.py        # Validator Agent — cross-check completeness
+│   │   ├── orchestrator.py     # Orchestrator — lifecycle, retry, routing
+│   │   └── llm.py              # Shared LLM client utilities
 │   ├── schemas/
 │   │   └── models.py           # Pydantic data models
 │   ├── main.py                 # FastAPI application entry point
@@ -261,18 +309,22 @@ workflowos/
 │   ├── app/
 │   │   ├── page.tsx            # Main application page
 │   │   ├── layout.tsx          # Root layout and metadata
-│   │   └── globals.css         # Global styles and Tailwind
+│   │   └── globals.css         # Global styles with Playfair Display + Inter
+│   ├── lib/
+│   │   ├── types.ts            # TypeScript type definitions
+│   │   └── data.ts             # Preset transcript data for demos
 │   ├── hooks/
-│   │   ├── useSSE.ts            # SSE real-time connection hook
+│   │   ├── useSSE.ts           # SSE real-time connection hook
 │   │   └── useKeyboardShortcuts.ts # Keyboard shortcut hook
 │   ├── components/
-│   │   ├── TranscriptInput.tsx  # Transcript paste/upload/drag-drop widget
-│   │   ├── AgentFeed.tsx        # Real-time agent activity feed w/ timing
-│   │   ├── ExecutionDashboard.tsx # Dashboard w/ timeline, heatmap, search, export
-│   │   ├── DependencyGraph.tsx  # Task dependency visualization
-│   │   ├── Toast.tsx            # Toast notification system
-│   │   ├── Header.tsx           # Application header w/ dark mode toggle
-│   │   └── Footer.tsx           # Application footer
+│   │   ├── Header.tsx          # Navigation header with dark mode toggle
+│   │   ├── Footer.tsx          # Application footer with links
+│   │   ├── TranscriptInput.tsx # Transcript input with preset selection
+│   │   ├── AgentFeed.tsx       # Agent swarm activity panel
+│   │   ├── ExecutionDashboard.tsx # Full dashboard with tasks, timeline, risks
+│   │   ├── DependencyGraph.tsx # Task dependency visualization
+│   │   └── Toast.tsx           # Toast notification system
+│   ├── .eslintrc.json          # ESLint configuration
 │   ├── Dockerfile              # Frontend container image
 │   └── package.json            # Node dependencies
 ├── infra/
@@ -287,7 +339,9 @@ workflowos/
 │   └── deploy.yml              # CD: build + deploy to Azure
 ├── docker-compose.yml          # Local development orchestration
 ├── pyproject.toml              # Python project metadata
-└── PROGRESS.md                 # Project completion tracker
+├── ARCHITECTURE.md             # Detailed architecture documentation
+├── FINAL_SUMMARY.md            # Complete feature checklist
+└── DEMO_WALKTHROUGH.md         # Step-by-step demo guide
 ```
 
 ---
@@ -310,9 +364,10 @@ az deployment sub create \
 ### Deploy Application (CI/CD)
 
 Push to the `main` branch triggers the [deploy workflow](.github/workflows/deploy.yml), which:
-1. Builds Docker images for backend and frontend
-2. Pushes images to Azure Container Registry
-3. Deploys to Azure Container Apps
+1. Runs linting and tests via CI
+2. Builds Docker images for backend and frontend
+3. Pushes images to Azure Container Registry
+4. Deploys both services to Azure Container Apps
 
 ### Manual Docker Build & Push
 
@@ -336,6 +391,7 @@ docker push workflowosacr.azurecr.io/workflowos-backend:latest
 
 - Run `ruff check .` before committing Python changes
 - Run `npm run lint` before committing frontend changes
+- Run `npm run build` to verify the frontend compiles
 - Add tests for new functionality
 - Update documentation for API changes
 
@@ -344,14 +400,6 @@ docker push workflowosacr.azurecr.io/workflowos-backend:latest
 ## License
 
 MIT — Built for Microsoft Build AI Hackathon 2026 · Agent Swarms Track
-
----
-
-## Team
-
-- **Team Member 1** — AI / Backend (Agent architecture, prompt engineering, Azure OpenAI)
-- **Team Member 2** — Frontend (Next.js, dashboard design, real-time agent feed)
-- **Team Member 3** — Architecture & Integration (Azure AI Foundry, pipeline design, JSON schema)
 
 ---
 
