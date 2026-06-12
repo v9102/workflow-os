@@ -1,8 +1,7 @@
 import json
-import os
 from typing import List
-from openai import AzureOpenAI
 from ..schemas.models import TaskItem, RiskAssessment, RiskLevel
+from .llm import get_client, get_deployment
 
 
 RISK_PROMPT = """
@@ -15,14 +14,17 @@ Consider these risk factors:
 - Speaker emphasis (repeated mentions, strong language)
 - Ambiguity in task definition
 
-Return a JSON array of risk assessments:
-[
-    {
-        "task_id": "task description",
-        "risk": "Low|Medium|High|Unknown",
-        "reasoning": "brief explanation"
-    }
-]
+Tasks are given as numbered entries ("<index>: <description>"). Return a JSON
+object with an "assessments" array, using the numeric index as task_id:
+{
+    "assessments": [
+        {
+            "task_id": "0",
+            "risk": "Low|Medium|High|Unknown",
+            "reasoning": "brief explanation"
+        }
+    ]
+}
 
 Risk Levels:
 - Low: Clear task, adequate time, few dependencies
@@ -34,24 +36,20 @@ Risk Levels:
 
 class RiskAgent:
     def __init__(self):
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
-        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self.client = get_client()
+        self.deployment = get_deployment()
 
     async def assess_risks(self, tasks: List[TaskItem], transcript: str) -> List[RiskAssessment]:
-        task_descriptions = [f"{i}: {t.task} (deadline: {t.deadline or 'none'}, deps: {t.dependencies})" 
+        task_descriptions = [f"{i}: {t.task} (deadline: {t.deadline or 'none'}, deps: {t.dependencies})"
                            for i, t in enumerate(tasks)]
-        
-        prompt = f"{RISK_PROMPT}\n\nTranscript context:\n{transcript[:3000]}\n\nTasks:\n" + "\n".join(task_descriptions)
 
-        response = self.client.chat.completions.create(
+        user_prompt = f"Transcript context:\n{transcript[:3000]}\n\nTasks:\n" + "\n".join(task_descriptions)
+
+        response = await self.client.chat.completions.create(
             model=self.deployment,
             messages=[
                 {"role": "system", "content": RISK_PROMPT},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": user_prompt}
             ],
             temperature=0.1,
             response_format={"type": "json_object"}
@@ -66,7 +64,7 @@ class RiskAgent:
             except ValueError:
                 risk = RiskLevel.UNKNOWN
             assessments.append(RiskAssessment(
-                task_id=item.get("task_id", ""),
+                task_id=str(item.get("task_id", "")),
                 risk=risk,
                 reasoning=item.get("reasoning", "")
             ))

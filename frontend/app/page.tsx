@@ -26,6 +26,8 @@ interface DashboardData {
   }>
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 interface AgentActivity {
   agent_name: string
   status: string
@@ -52,7 +54,7 @@ export default function Home() {
     setActivities([])
 
     try {
-      const response = await fetch("http://localhost:8000/api/transcript/process", {
+      const response = await fetch(`${API_URL}/api/transcript/process`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript }),
@@ -69,13 +71,21 @@ export default function Home() {
         eventSourceRef.current.close()
       }
 
-      eventSourceRef.current = new EventSource(`http://localhost:8000/api/activities/${data.transcript_id}/stream`)
-      
+      eventSourceRef.current = new EventSource(`${API_URL}/api/activities/${data.transcript_id}/stream`)
+
       eventSourceRef.current.onmessage = (event) => {
-        const activity = JSON.parse(event.data)
-        setActivities(prev => [...prev, activity])
-        
-        if (activity.agent_name === "Orchestrator" && activity.status === "completed") {
+        const payload = JSON.parse(event.data)
+
+        if (payload.event === "done") {
+          eventSourceRef.current?.close()
+          fetchDashboard(data.transcript_id)
+          return
+        }
+
+        setActivities(prev => [...prev, payload])
+
+        if (payload.agent_name === "Orchestrator" && payload.status === "completed") {
+          eventSourceRef.current?.close()
           fetchDashboard(data.transcript_id)
         }
       }
@@ -93,15 +103,20 @@ export default function Home() {
 
   const fetchDashboard = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/dashboard/${id}`)
+      const response = await fetch(`${API_URL}/api/dashboard/${id}`)
       if (response.ok) {
         const data = await response.json()
         setDashboardData(data.dashboard)
         setActivities(data.activities)
+        setIsProcessing(false)
+      } else if (response.status === 409) {
+        setTimeout(() => fetchDashboard(id), 2000)
+      } else {
+        setError("Failed to fetch dashboard")
+        setIsProcessing(false)
       }
     } catch (err) {
       console.error("Failed to fetch dashboard:", err)
-    } finally {
       setIsProcessing(false)
     }
   }

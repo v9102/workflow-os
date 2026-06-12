@@ -45,12 +45,19 @@ class AssignmentResult(BaseModel):
     confidence: float
 
 
+class ValidationIssue(BaseModel):
+    task_id: str
+    issue_type: str
+    detail: str
+
+
 class ExecutionDashboard(BaseModel):
     transcript_id: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     tasks: List[TaskItem] = []
     summary: str = ""
     timeline: List[dict] = []
+    validation_issues: List[ValidationIssue] = []
 
 
 class AgentActivity(BaseModel):

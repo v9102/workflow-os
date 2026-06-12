@@ -1,19 +1,19 @@
-import os
+import asyncio
+import json
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
 from .schemas.models import (
-    TranscriptRequest, TranscriptResponse, DashboardResponse,
-    ExecutionDashboard, AgentActivity, AgentStatus
+    TranscriptResponse, DashboardResponse, AgentActivity
 )
 from .agents.orchestrator import OrchestratorAgent
 
 
-orchestrator = OrchestratorAgent()
 active_sessions: dict = {}
 
 
@@ -40,41 +40,58 @@ class ProcessRequest(BaseModel):
     meeting_id: Optional[str] = None
 
 
-class ActivityUpdate(BaseModel):
-    session_id: str
-    activities: List[AgentActivity]
+async def _run_pipeline(session_id: str, transcript: str):
+    session = active_sessions[session_id]
+
+    async def activity_callback(activity: AgentActivity):
+        session["activities"].append(activity)
+        await session["queue"].put(activity)
+
+    orchestrator = OrchestratorAgent(activity_callback=activity_callback)
+    try:
+        dashboard = await orchestrator.process_transcript(transcript, session_id)
+        session["dashboard"] = dashboard
+        session["status"] = "completed"
+    except Exception as e:
+        session["status"] = "failed"
+        session["error"] = str(e)
+    finally:
+        await session["queue"].put(None)
 
 
 @app.post("/api/transcript/process", response_model=TranscriptResponse)
 async def process_transcript(request: ProcessRequest):
+    if not request.transcript.strip():
+        raise HTTPException(status_code=422, detail="Transcript is empty")
+
     session_id = request.meeting_id or str(uuid.uuid4())[:8]
-    active_sessions[session_id] = {"status": "processing", "dashboard": None, "activities": []}
-    
-    async def activity_callback(activity: AgentActivity):
-        active_sessions[session_id]["activities"].append(activity)
-    
-    orchestrator.set_activity_callback(activity_callback)
-    
-    try:
-        dashboard = await orchestrator.process_transcript(request.transcript, session_id)
-        active_sessions[session_id]["status"] = "completed"
-        active_sessions[session_id]["dashboard"] = dashboard
-        return TranscriptResponse(
-            transcript_id=session_id,
-            status="completed",
-            message="Transcript processed successfully"
-        )
-    except Exception as e:
-        active_sessions[session_id]["status"] = "failed"
-        raise HTTPException(status_code=500, detail=str(e))
+    active_sessions[session_id] = {
+        "status": "processing",
+        "dashboard": None,
+        "activities": [],
+        "error": None,
+        "queue": asyncio.Queue(),
+    }
+
+    asyncio.create_task(_run_pipeline(session_id, request.transcript))
+
+    return TranscriptResponse(
+        transcript_id=session_id,
+        status="processing",
+        message="Transcript processing started"
+    )
 
 
 @app.get("/api/dashboard/{session_id}", response_model=DashboardResponse)
 async def get_dashboard(session_id: str):
     if session_id not in active_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     session = active_sessions[session_id]
+    if session["status"] == "failed":
+        raise HTTPException(status_code=500, detail=session["error"] or "Processing failed")
+    if session["dashboard"] is None:
+        raise HTTPException(status_code=409, detail="Processing not complete")
     return DashboardResponse(
         dashboard=session["dashboard"],
         activities=session["activities"]
@@ -86,6 +103,40 @@ async def get_activities(session_id: str):
     if session_id not in active_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     return active_sessions[session_id]["activities"]
+
+
+@app.get("/api/activities/{session_id}/stream")
+async def stream_activities(session_id: str):
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = active_sessions[session_id]
+
+    async def event_generator():
+        for activity in session["activities"]:
+            yield f"data: {activity.model_dump_json()}\n\n"
+        if session["status"] != "processing":
+            return
+        while True:
+            activity = await session["queue"].get()
+            if activity is None:
+                break
+            yield f"data: {activity.model_dump_json()}\n\n"
+        yield f"data: {json.dumps({'event': 'done', 'status': session['status']})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/status/{session_id}")
+async def get_status(session_id: str):
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session = active_sessions[session_id]
+    return {"session_id": session_id, "status": session["status"], "error": session["error"]}
 
 
 @app.get("/api/health")

@@ -1,8 +1,7 @@
 import json
-import os
-from typing import List
-from openai import AzureOpenAI
+from typing import Optional
 from ..schemas.models import ExtractionResult, TaskItem
+from .llm import get_client, get_deployment
 
 
 EXTRACTION_PROMPT = """
@@ -32,18 +31,18 @@ Guidelines:
 
 class ExtractionAgent:
     def __init__(self):
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
-        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self.client = get_client()
+        self.deployment = get_deployment()
 
-    async def extract(self, transcript: str) -> ExtractionResult:
-        response = self.client.chat.completions.create(
+    async def extract(self, transcript: str, context_hint: Optional[str] = None) -> ExtractionResult:
+        system_prompt = EXTRACTION_PROMPT
+        if context_hint:
+            system_prompt += f"\nAdditional instruction from a downstream agent:\n{context_hint}\n"
+
+        response = await self.client.chat.completions.create(
             model=self.deployment,
             messages=[
-                {"role": "system", "content": EXTRACTION_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": transcript}
             ],
             temperature=0.1,
@@ -53,11 +52,12 @@ class ExtractionAgent:
         result = json.loads(response.choices[0].message.content)
         tasks = [
             TaskItem(
+                id=str(i),
                 task=t["task"],
                 deadline=t.get("deadline"),
                 dependencies=t.get("dependencies", []),
                 decision=t.get("decision")
             )
-            for t in result.get("tasks", [])
+            for i, t in enumerate(result.get("tasks", []))
         ]
         return ExtractionResult(tasks=tasks, decisions=result.get("decisions", []))
