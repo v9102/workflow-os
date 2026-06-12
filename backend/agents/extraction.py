@@ -34,20 +34,27 @@ Guidelines:
 
 class ExtractionAgent:
     def __init__(self):
+        self._client = None
+        self._deployment = None
+
+    def _ensure_client(self):
+        if self._client is not None:
+            return
         api_key = os.getenv("AZURE_OPENAI_API_KEY")
         if not api_key:
             logger.warning("AZURE_OPENAI_API_KEY not set; using placeholder")
-        self.client = AzureOpenAI(
+        self._client = AzureOpenAI(
             api_key=api_key or "placeholder",
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "")
         )
-        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
     async def extract(self, transcript: str) -> ExtractionResult:
+        self._ensure_client()
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment,
+            response = self._client.chat.completions.create(
+                model=self._deployment,
                 messages=[
                     {"role": "system", "content": EXTRACTION_PROMPT},
                     {"role": "user", "content": transcript}

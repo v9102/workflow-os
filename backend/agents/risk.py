@@ -34,21 +34,28 @@ Risk Levels:
 
 class RiskAgent:
     def __init__(self):
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        self._client = None
+        self._deployment = None
+
+    def _ensure_client(self):
+        if self._client is not None:
+            return
+        self._client = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY", "placeholder"),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "")
         )
-        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
     async def assess_risks(self, tasks: List[TaskItem], transcript: str) -> List[RiskAssessment]:
+        self._ensure_client()
         task_descriptions = [f"{i}: {t.task} (deadline: {t.deadline or 'none'}, deps: {t.dependencies})" 
                            for i, t in enumerate(tasks)]
         
         prompt = f"{RISK_PROMPT}\n\nTranscript context:\n{transcript[:3000]}\n\nTasks:\n" + "\n".join(task_descriptions)
 
-        response = self.client.chat.completions.create(
-            model=self.deployment,
+        response = self._client.chat.completions.create(
+            model=self._deployment,
             messages=[
                 {"role": "system", "content": RISK_PROMPT},
                 {"role": "user", "content": prompt}

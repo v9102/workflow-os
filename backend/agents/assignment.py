@@ -31,19 +31,21 @@ Extract speaker names from the transcript context.
 
 class AssignmentAgent:
     def __init__(self):
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
-        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self._client = None
+        self._deployment = None
 
-    def _extract_speakers(self, transcript: str) -> List[str]:
-        pattern = r'^(\w+):\s'
-        speakers = set(re.findall(pattern, transcript, re.MULTILINE))
-        return list(speakers)
+    def _ensure_client(self):
+        if self._client is not None:
+            return
+        self._client = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY", "placeholder"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        )
+        self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
     async def assign_owners(self, tasks: List[TaskItem], transcript: str) -> List[AssignmentResult]:
+        self._ensure_client()
         speakers = self._extract_speakers(transcript)
         speaker_context = f"Identified speakers: {', '.join(speakers)}" if speakers else "No clear speakers identified"
         
@@ -51,8 +53,8 @@ class AssignmentAgent:
         
         prompt = f"{ASSIGNMENT_PROMPT}\n\n{speaker_context}\n\nTranscript:\n{transcript[:4000]}\n\nTasks:\n" + "\n".join(task_descriptions)
 
-        response = self.client.chat.completions.create(
-            model=self.deployment,
+        response = self._client.chat.completions.create(
+            model=self._deployment,
             messages=[
                 {"role": "system", "content": ASSIGNMENT_PROMPT},
                 {"role": "user", "content": prompt}

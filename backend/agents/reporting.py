@@ -24,19 +24,26 @@ Include risk level for each task.
 
 class ReportingAgent:
     def __init__(self):
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        self._client = None
+        self._deployment = None
+
+    def _ensure_client(self):
+        if self._client is not None:
+            return
+        self._client = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY", "placeholder"),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "")
         )
-        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
     async def generate_dashboard(
-        self, 
+        self,
         transcript_id: str,
-        tasks: List[TaskItem], 
+        tasks: List[TaskItem],
         transcript: str
     ) -> ExecutionDashboard:
+        self._ensure_client()
         task_summaries = [
             f"{t.task} | Owner: {t.owner or 'Unassigned'} | Deadline: {t.deadline or 'Unknown'} | Risk: {t.risk.value}"
             for t in tasks
@@ -44,8 +51,8 @@ class ReportingAgent:
 
         prompt = f"{REPORTING_PROMPT}\n\nTranscript:\n{transcript[:3000]}\n\nTasks:\n" + "\n".join(task_summaries)
 
-        response = self.client.chat.completions.create(
-            model=self.deployment,
+        response = self._client.chat.completions.create(
+            model=self._deployment,
             messages=[
                 {"role": "system", "content": REPORTING_PROMPT},
                 {"role": "user", "content": prompt}
