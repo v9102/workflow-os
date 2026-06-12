@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue)
 ![Next.js 14](https://img.shields.io/badge/Next.js-14-black)
+![Progress](https://img.shields.io/badge/Progress-100%25-brightgreen)
 
 ```
 Transcript → [Extraction → Risk → Assignment → Reporting] → Dashboard → Planner/Teams
@@ -214,14 +215,18 @@ The test suite includes:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/health` | Health check |
+| `GET` | `/api/health` | Health check (version, schema, env status) |
 | `POST` | `/api/transcript/process` | Submit transcript for processing |
+| `POST` | `/api/retry` | Retry a failed session |
 | `GET` | `/api/dashboard/{session_id}` | Get dashboard results |
 | `GET` | `/api/activities/{session_id}` | Get agent activity log |
-| `GET` | `/api/activities/{session_id}/stream` | SSE stream of agent activity |
+| `GET` | `/api/activities/{session_id}/stream` | SSE stream of real-time agent activity |
 | `GET` | `/api/status/{session_id}` | Get session status |
+| `GET` | `/api/audit/{session_id}` | Get audit log for a session |
+| `GET` | `/api/sessions` | List all sessions |
 | `POST` | `/api/export/planner` | Push tasks to Microsoft Planner |
 | `POST` | `/api/export/teams` | Send summary to Microsoft Teams |
+| `POST` | `/api/export/pdf` | Download report as Markdown |
 
 Full interactive docs at `http://localhost:8000/docs` when the backend is running.
 
@@ -241,10 +246,14 @@ workflowos/
 │   ├── schemas/
 │   │   └── models.py           # Pydantic data models
 │   ├── main.py                 # FastAPI application entry point
-│   ├── db.py                   # Cosmos DB / in-memory session store
+│   ├── db.py                   # Cosmos DB / in-memory session store + audit
 │   ├── cache.py                # Redis caching layer
 │   ├── feedback.py             # Service Bus feedback queue
 │   ├── m365.py                 # Microsoft Graph API client
+│   ├── webhooks.py             # Webhook notification service
+│   ├── audit.py                # Audit logging (file + DB)
+│   ├── middleware.py           # Rate limiting middleware
+│   ├── validation.py           # Input sanitization & validation
 │   ├── utils.py                # Retry, logging, timer utilities
 │   ├── Dockerfile              # Backend container image
 │   └── requirements.txt        # Python dependencies
@@ -253,11 +262,16 @@ workflowos/
 │   │   ├── page.tsx            # Main application page
 │   │   ├── layout.tsx          # Root layout and metadata
 │   │   └── globals.css         # Global styles and Tailwind
+│   ├── hooks/
+│   │   ├── useSSE.ts            # SSE real-time connection hook
+│   │   └── useKeyboardShortcuts.ts # Keyboard shortcut hook
 │   ├── components/
-│   │   ├── TranscriptInput.tsx  # Transcript paste/upload widget
-│   │   ├── AgentFeed.tsx        # Real-time agent activity feed
-│   │   ├── ExecutionDashboard.tsx # Dashboard with timeline, heatmap
-│   │   ├── Header.tsx           # Application header
+│   │   ├── TranscriptInput.tsx  # Transcript paste/upload/drag-drop widget
+│   │   ├── AgentFeed.tsx        # Real-time agent activity feed w/ timing
+│   │   ├── ExecutionDashboard.tsx # Dashboard w/ timeline, heatmap, search, export
+│   │   ├── DependencyGraph.tsx  # Task dependency visualization
+│   │   ├── Toast.tsx            # Toast notification system
+│   │   ├── Header.tsx           # Application header w/ dark mode toggle
 │   │   └── Footer.tsx           # Application footer
 │   ├── Dockerfile              # Frontend container image
 │   └── package.json            # Node dependencies
