@@ -1,0 +1,84 @@
+WorkflowOS — Pending Tasks & Percentage Report
+==============================================
+Generated: 2026-06-13 02:05 UTC
+Branch: main (merged shaunak — best version)
+
+Overall Completion: ~70%
+
+Breakdown by Severity
+---------------------
+  Critical: 7/7 (100%)   — weight ×3
+  High:     9/11 (82%)   — weight ×2
+  Medium:   2/10 (20%)   — weight ×1
+  Low:      2/14 (14%)   — weight ×0.5
+
+Weighted Score: 70%
+
+
+Completed (✓)
+--------------
+CRITICAL (7/7):
+  ✓ Docker infrastructure (Dockerfiles + docker-compose)
+  ✓ Cosmos DB persistence layer
+  ✓ Microsoft 365 integration (Planner + Teams Graph API)
+  ✓ Test suite (10 passing: validator, db, schemas)
+  ✓ CI/CD pipelines (GitHub Actions)
+  ✓ Azure Bicep deployment templates
+  ✓ Service Bus feedback queue
+
+HIGH (9/11):
+  ✓ Retry logic with exponential backoff
+  ✓ Redis caching with JSON serialization
+  ✓ Structured logging infrastructure
+  ✓ Agent resilience (error handling, JSON fallback, lazy init)
+  ✓ Frontend timeline visualization
+  ✓ Frontend risk heatmap
+  ✓ Export buttons (Planner, Teams, Copy Markdown)
+  ✓ Agent pipeline fixes (sync/async client, missing imports, context_hint)
+  ✓ Frontend Fabel-level redesign (CSS animations, dark mode toggle, glassmorphism)
+
+MEDIUM (2/10):
+  ✓ Loading skeletons / pulse animations (part of Fabel redesign)
+  ✓ Dark mode with manual toggle & localStorage persistence
+
+LOW (2/14):
+  ✓ Page transition animations (CSS keyframes: fadeIn, slideUp)
+  ✓ Font optimization (Inter via next/font with display=swap)
+
+
+Pending (25 items)
+------------------
+HIGH (2):
+  [ ] Task dependency graph visualization
+  [ ] WebSocket/SSE real-time agent feed updates
+
+MEDIUM (8):
+  [ ] Agent performance monitoring dashboard
+  [ ] Error recovery with manual retry button
+  [ ] Export to PDF / email
+  [ ] Webhook notifications for pipeline completion
+  [ ] Audit log for all agent actions
+  [ ] Schema versioning / migration
+  [ ] Rate limiting for API endpoints
+  [ ] Input validation & sanitization hardening
+
+LOW (12):
+  [ ] Toast notifications for in-app status changes
+  [ ] Keyboard shortcuts for common actions
+  [ ] Responsive table column hiding on mobile
+  [ ] Accessibility pass (aria labels, keyboard nav, focus management)
+  [ ] PWA support (manifest, service worker)
+  [ ] API documentation with Swagger/OpenAPI extensions
+  [ ] Environment variable validation on startup
+  [ ] Search / filter for task table
+  [ ] Drag-and-drop transcript file upload
+  [ ] Copy individual task rows
+  [ ] Undo / confirm for export operations
+  [ ] Pipeline timeout UI feedback
+
+NICE-TO-HAVE (not scoped):
+  [ ] Agent speed / performance indicators
+  [ ] Collapsible dashboard sections
+  [ ] More granular dark mode contrast options
+  [ ] SEO meta enhancements
+  [ ] Health check endpoint enhancements (DB status, LLM latency)
