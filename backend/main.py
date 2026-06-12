@@ -2,6 +2,7 @@ import asyncio
 import json
 import uuid
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -9,11 +10,16 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 from .schemas.models import (
-    TranscriptResponse, DashboardResponse, AgentActivity
+    TranscriptRequest, TranscriptResponse, DashboardResponse,
+    ExecutionDashboard, AgentActivity, AgentStatus
 )
 from .agents.orchestrator import OrchestratorAgent
+from . import db
+from .m365 import graph_client
 
+load_dotenv()
 
+orchestrator = OrchestratorAgent()
 active_sessions: dict = {}
 
 
@@ -40,58 +46,45 @@ class ProcessRequest(BaseModel):
     meeting_id: Optional[str] = None
 
 
-async def _run_pipeline(session_id: str, transcript: str):
-    session = active_sessions[session_id]
-
-    async def activity_callback(activity: AgentActivity):
-        session["activities"].append(activity)
-        await session["queue"].put(activity)
-
-    orchestrator = OrchestratorAgent(activity_callback=activity_callback)
-    try:
-        dashboard = await orchestrator.process_transcript(transcript, session_id)
-        session["dashboard"] = dashboard
-        session["status"] = "completed"
-    except Exception as e:
-        session["status"] = "failed"
-        session["error"] = str(e)
-    finally:
-        await session["queue"].put(None)
+class ActivityUpdate(BaseModel):
+    session_id: str
+    activities: List[AgentActivity]
 
 
 @app.post("/api/transcript/process", response_model=TranscriptResponse)
 async def process_transcript(request: ProcessRequest):
-    if not request.transcript.strip():
-        raise HTTPException(status_code=422, detail="Transcript is empty")
-
     session_id = request.meeting_id or str(uuid.uuid4())[:8]
-    active_sessions[session_id] = {
-        "status": "processing",
-        "dashboard": None,
-        "activities": [],
-        "error": None,
-        "queue": asyncio.Queue(),
-    }
+    session = {"status": "processing", "dashboard": None, "activities": []}
+    active_sessions[session_id] = session
+    await db.save_session(session_id, session)
 
-    asyncio.create_task(_run_pipeline(session_id, request.transcript))
+    async def activity_callback(activity: AgentActivity):
+        active_sessions[session_id]["activities"].append(activity)
+        await db.save_session(session_id, active_sessions[session_id])
 
-    return TranscriptResponse(
-        transcript_id=session_id,
-        status="processing",
-        message="Transcript processing started"
-    )
+    orchestrator.set_activity_callback(activity_callback)
+
+    try:
+        dashboard = await orchestrator.process_transcript(request.transcript, session_id)
+        session["status"] = "completed"
+        session["dashboard"] = dashboard
+        await db.save_session(session_id, session)
+        return TranscriptResponse(
+            transcript_id=session_id,
+            status="completed",
+            message="Transcript processed successfully"
+        )
+    except Exception as e:
+        session["status"] = "failed"
+        await db.save_session(session_id, session)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/dashboard/{session_id}", response_model=DashboardResponse)
 async def get_dashboard(session_id: str):
-    if session_id not in active_sessions:
+    session = await db.get_session(session_id) or active_sessions.get(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-
-    session = active_sessions[session_id]
-    if session["status"] == "failed":
-        raise HTTPException(status_code=500, detail=session["error"] or "Processing failed")
-    if session["dashboard"] is None:
-        raise HTTPException(status_code=409, detail="Processing not complete")
     return DashboardResponse(
         dashboard=session["dashboard"],
         activities=session["activities"]
@@ -100,29 +93,36 @@ async def get_dashboard(session_id: str):
 
 @app.get("/api/activities/{session_id}", response_model=List[AgentActivity])
 async def get_activities(session_id: str):
-    if session_id not in active_sessions:
+    session = await db.get_session(session_id) or active_sessions.get(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return active_sessions[session_id]["activities"]
+    return session["activities"]
 
 
 @app.get("/api/activities/{session_id}/stream")
 async def stream_activities(session_id: str):
-    if session_id not in active_sessions:
+    session = await db.get_session(session_id) or active_sessions.get(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session = active_sessions[session_id]
-
     async def event_generator():
-        for activity in session["activities"]:
+        for activity in session.get("activities", []):
             yield f"data: {activity.model_dump_json()}\n\n"
-        if session["status"] != "processing":
+        if session.get("status") == "completed":
+            yield f"data: {json.dumps({'event': 'done', 'status': 'completed'})}\n\n"
             return
         while True:
-            activity = await session["queue"].get()
-            if activity is None:
+            await asyncio.sleep(0.5)
+            current = await db.get_session(session_id) or active_sessions.get(session_id, {})
+            new_count = len(current.get("activities", []))
+            old_count = len(session.get("activities", []))
+            if new_count > old_count:
+                for activity in current["activities"][old_count:]:
+                    yield f"data: {activity.model_dump_json()}\n\n"
+                session["activities"] = current["activities"]
+            if current.get("status") in ("completed", "failed"):
+                yield f"data: {json.dumps({'event': 'done', 'status': current['status']})}\n\n"
                 break
-            yield f"data: {activity.model_dump_json()}\n\n"
-        yield f"data: {json.dumps({'event': 'done', 'status': session['status']})}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -133,10 +133,63 @@ async def stream_activities(session_id: str):
 
 @app.get("/api/status/{session_id}")
 async def get_status(session_id: str):
-    if session_id not in active_sessions:
+    session = await db.get_session(session_id) or active_sessions.get(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    session = active_sessions[session_id]
-    return {"session_id": session_id, "status": session["status"], "error": session["error"]}
+    return {"session_id": session_id, "status": session["status"]}
+
+
+class ExportToPlannerRequest(BaseModel):
+    session_id: str
+    plan_id: str
+    bucket_id: Optional[str] = None
+
+
+class ExportToTeamsRequest(BaseModel):
+    session_id: str
+    team_id: str
+    channel_id: str
+
+
+@app.post("/api/export/planner")
+async def export_to_planner(request: ExportToPlannerRequest):
+    session = await db.get_session(request.session_id) or active_sessions.get(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    dashboard = session.get("dashboard")
+    if not dashboard:
+        raise HTTPException(status_code=409, detail="Dashboard not ready")
+    results = []
+    for task in dashboard.tasks:
+        result = await graph_client.push_to_planner(
+            plan_id=request.plan_id,
+            title=f"[{task.risk.value}] {task.task}",
+            bucket_id=request.bucket_id,
+        )
+        results.append(result)
+    return {"status": "ok", "pushed": len(results)}
+
+
+@app.post("/api/export/teams")
+async def export_to_teams(request: ExportToTeamsRequest):
+    session = await db.get_session(request.session_id) or active_sessions.get(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    dashboard = session.get("dashboard")
+    if not dashboard:
+        raise HTTPException(status_code=409, detail="Dashboard not ready")
+    summary = dashboard.summary
+    task_list = "\n".join(
+        f"- [{t.risk.value}] {t.task} ({t.owner or 'Unassigned'})"
+        for t in dashboard.tasks
+    )
+    message = f"## WorkflowOS Summary\n\n{summary}\n\n### Tasks\n{task_list}"
+    await graph_client.send_teams_message(
+        team_id=request.team_id,
+        channel_id=request.channel_id,
+        message=message,
+    )
+    return {"status": "ok"}
 
 
 @app.get("/api/health")

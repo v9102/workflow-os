@@ -1,8 +1,11 @@
 import json
-from typing import Optional
+import os
+import logging
+from typing import List
+from openai import AzureOpenAI
 from ..schemas.models import ExtractionResult, TaskItem
-from .llm import get_client, get_deployment
 
+logger = logging.getLogger("workflowos.extraction")
 
 EXTRACTION_PROMPT = """
 You are an expert at extracting actionable items from meeting transcripts.
@@ -31,33 +34,53 @@ Guidelines:
 
 class ExtractionAgent:
     def __init__(self):
-        self.client = get_client()
-        self.deployment = get_deployment()
+        self._client = None
+        self._deployment = None
 
-    async def extract(self, transcript: str, context_hint: Optional[str] = None) -> ExtractionResult:
-        system_prompt = EXTRACTION_PROMPT
-        if context_hint:
-            system_prompt += f"\nAdditional instruction from a downstream agent:\n{context_hint}\n"
-
-        response = await self.client.chat.completions.create(
-            model=self.deployment,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": transcript}
-            ],
-            temperature=0.1,
-            response_format={"type": "json_object"}
+    def _ensure_client(self):
+        if self._client is not None:
+            return
+        api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("AZURE_OPENAI_API_KEY not set; using placeholder")
+        self._client = AzureOpenAI(
+            api_key=api_key or "placeholder",
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "")
         )
+        self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
-        result = json.loads(response.choices[0].message.content)
-        tasks = [
-            TaskItem(
+    async def extract(self, transcript: str) -> ExtractionResult:
+        self._ensure_client()
+        try:
+            response = self._client.chat.completions.create(
+                model=self._deployment,
+                messages=[
+                    {"role": "system", "content": EXTRACTION_PROMPT},
+                    {"role": "user", "content": transcript}
+                ],
+                temperature=0.1,
+                response_format={"type": "json_object"},
+                timeout=30,
+            )
+            raw = response.choices[0].message.content
+        except Exception as e:
+            logger.error("OpenAI extraction failed: %s", e)
+            return ExtractionResult(tasks=[], decisions=[])
+
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.error("Failed to parse extraction JSON: %s", raw[:200])
+            return ExtractionResult(tasks=[], decisions=[])
+
+        tasks = []
+        for i, t in enumerate(result.get("tasks", [])):
+            tasks.append(TaskItem(
                 id=str(i),
-                task=t["task"],
+                task=t.get("task", ""),
                 deadline=t.get("deadline"),
                 dependencies=t.get("dependencies", []),
-                decision=t.get("decision")
-            )
-            for i, t in enumerate(result.get("tasks", []))
-        ]
+                decision=t.get("decision"),
+            ))
         return ExtractionResult(tasks=tasks, decisions=result.get("decisions", []))
