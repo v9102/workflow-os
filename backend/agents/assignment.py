@@ -44,6 +44,9 @@ class AssignmentAgent:
         )
         self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
+    def _extract_speakers(self, transcript: str) -> List[str]:
+        return list(set(re.findall(r'^(\w+):\s', transcript, re.MULTILINE)))
+
     async def assign_owners(self, tasks: List[TaskItem], transcript: str) -> List[AssignmentResult]:
         self._ensure_client()
         speakers = self._extract_speakers(transcript)
