@@ -154,7 +154,7 @@ export default function Home() {
               
               <div className="lg:col-span-2">
                 {activeTab === "dashboard" && dashboardData && (
-                  <ExecutionDashboard data={dashboardData} />
+                  <ExecutionDashboard data={dashboardData} sessionId={sessionId ?? undefined} />
                 )}
               </div>
             </div>
@@ -162,7 +162,7 @@ export default function Home() {
 
           {dashboardData && activeTab === "feed" && (
             <div className="mt-6">
-              <ExecutionDashboard data={dashboardData} />
+              <ExecutionDashboard data={dashboardData} sessionId={sessionId ?? undefined} />
             </div>
           )}
         </div>
