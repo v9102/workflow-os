@@ -15,6 +15,7 @@ from .schemas.models import (
 )
 from .agents.orchestrator import OrchestratorAgent
 from . import db
+from .m365 import graph_client
 
 load_dotenv()
 
@@ -136,6 +137,59 @@ async def get_status(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"session_id": session_id, "status": session["status"]}
+
+
+class ExportToPlannerRequest(BaseModel):
+    session_id: str
+    plan_id: str
+    bucket_id: Optional[str] = None
+
+
+class ExportToTeamsRequest(BaseModel):
+    session_id: str
+    team_id: str
+    channel_id: str
+
+
+@app.post("/api/export/planner")
+async def export_to_planner(request: ExportToPlannerRequest):
+    session = await db.get_session(request.session_id) or active_sessions.get(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    dashboard = session.get("dashboard")
+    if not dashboard:
+        raise HTTPException(status_code=409, detail="Dashboard not ready")
+    results = []
+    for task in dashboard.tasks:
+        result = await graph_client.push_to_planner(
+            plan_id=request.plan_id,
+            title=f"[{task.risk.value}] {task.task}",
+            bucket_id=request.bucket_id,
+        )
+        results.append(result)
+    return {"status": "ok", "pushed": len(results)}
+
+
+@app.post("/api/export/teams")
+async def export_to_teams(request: ExportToTeamsRequest):
+    session = await db.get_session(request.session_id) or active_sessions.get(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    dashboard = session.get("dashboard")
+    if not dashboard:
+        raise HTTPException(status_code=409, detail="Dashboard not ready")
+    summary = dashboard.summary
+    task_list = "\n".join(
+        f"- [{t.risk.value}] {t.task} ({t.owner or 'Unassigned'})"
+        for t in dashboard.tasks
+    )
+    message = f"## WorkflowOS Summary\n\n{summary}\n\n### Tasks\n{task_list}"
+    await graph_client.send_teams_message(
+        team_id=request.team_id,
+        channel_id=request.channel_id,
+        message=message,
+    )
+    return {"status": "ok"}
 
 
 @app.get("/api/health")
