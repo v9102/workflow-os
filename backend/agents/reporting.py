@@ -31,7 +31,6 @@ class ReportingAgent:
         tasks: List[TaskItem],
         transcript: str
     ) -> ExecutionDashboard:
-        self._ensure_client()
         task_summaries = [
             f"{t.task} | Owner: {t.owner or 'Unassigned'} | Deadline: {t.deadline or 'Unknown'} | Risk: {t.risk.value}"
             for t in tasks

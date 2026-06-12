@@ -1,6 +1,8 @@
 import json
+import os
 import re
 from typing import List
+from openai import AzureOpenAI
 from ..schemas.models import TaskItem, AssignmentResult
 from .llm import get_client, get_deployment
 
@@ -37,14 +39,14 @@ class AssignmentAgent:
         self._deployment = None
 
     def _ensure_client(self):
-        if self._client is not None:
+        if hasattr(self, 'client') and self.client is not None:
             return
-        self._client = AzureOpenAI(
+        self.client = AzureOpenAI(
             api_key=os.getenv("AZURE_OPENAI_API_KEY", "placeholder"),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "")
         )
-        self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
     def _extract_speakers(self, transcript: str) -> List[str]:
         return list(set(re.findall(r'^(\w+):\s', transcript, re.MULTILINE)))
@@ -58,7 +60,7 @@ class AssignmentAgent:
 
         user_prompt = f"{speaker_context}\n\nTranscript:\n{transcript[:4000]}\n\nTasks:\n" + "\n".join(task_descriptions)
 
-        response = await self.client.chat.completions.create(
+        response = self.client.chat.completions.create(
             model=self.deployment,
             messages=[
                 {"role": "system", "content": ASSIGNMENT_PROMPT},

@@ -13,11 +13,7 @@ export const metadata: Metadata = {
   description: "Transform meeting transcripts into actionable execution plans using AI agent swarms",
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

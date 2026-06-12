@@ -1,7 +1,7 @@
 "use client"
 
-import { FileText, Send, Loader2, AlertCircle, CheckCircle } from "lucide-react"
-import { useRef } from "react"
+import { FileText, Send, Loader2, AlertCircle } from "lucide-react"
+import { useRef, useState } from "react"
 
 interface TranscriptInputProps {
   transcript: string
@@ -42,43 +42,50 @@ export function TranscriptInput({ transcript, setTranscript, isProcessing, onPro
     textareaRef.current?.focus()
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onProcess()
-  }
-
   return (
-    <div className="bg-white dark:bg-dark-800 rounded-2xl border border-dark-200 dark:border-dark-700 p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-dark-900 dark:text-white flex items-center gap-2">
-          <FileText className="w-5 h-5 text-primary-500" />
+    <div
+      className="rounded-2xl border transition-all duration-300"
+      style={{
+        backgroundColor: "var(--color-surface)",
+        borderColor: focused ? "var(--color-accent)" : "var(--color-border)",
+        boxShadow: focused
+          ? "0 0 0 3px rgba(99, 102, 241, 0.08), 0 1px 3px rgba(0,0,0,0.04)"
+          : "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)",
+      }}
+    >
+      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+        <label className="text-sm font-medium flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
+          <FileText className="w-4 h-4" style={{ color: "var(--color-accent)" }} />
           Meeting Transcript
         </label>
         <button
           onClick={handlePasteSample}
-          disabled={isProcessing || transcript.length > 0}
-          className="text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50 flex items-center gap-1"
+          disabled={isProcessing}
+          className="text-xs font-medium transition-opacity disabled:opacity-40 hover:opacity-70"
+          style={{ color: "var(--color-accent)" }}
         >
           + Load sample
         </button>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(e) => { e.preventDefault(); onProcess() }} className="px-5 pb-5">
         <div className="relative">
           <textarea
             ref={textareaRef}
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Paste your meeting transcript here..."
-            rows={6}
-            className="w-full px-4 py-3 border border-dark-300 dark:border-dark-600 rounded-xl bg-dark-50 dark:bg-dark-900 text-dark-900 dark:text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none transition-all"
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder="Paste your meeting transcript here…"
+            rows={7}
             disabled={isProcessing}
+            className="w-full px-4 py-3.5 rounded-xl border text-sm resize-none transition-all duration-200 placeholder:select-none"
+            style={{
+              backgroundColor: "var(--color-panel)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-ink)",
+            }}
           />
-          {transcript.length > 0 && (
-            <div className="absolute bottom-3 right-3 text-xs text-dark-400">
-              {transcript.length} characters
-            </div>
-          )}
         </div>
 
         {error && (
@@ -90,9 +97,19 @@ export function TranscriptInput({ transcript, setTranscript, isProcessing, onPro
 
         <button
           type="submit"
-          onClick={onProcess}
           disabled={isProcessing || !transcript.trim()}
-          className="mt-4 w-full py-3 px-6 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+          className="mt-4 w-full py-3 px-6 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+          style={{
+            backgroundColor: "var(--color-accent)",
+            color: "white",
+            opacity: isProcessing || !transcript.trim() ? 0.5 : 1,
+          }}
+          onMouseEnter={(e) => {
+            if (!isProcessing && transcript.trim()) e.currentTarget.style.opacity = "0.9"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = isProcessing || !transcript.trim() ? "0.5" : "1"
+          }}
         >
           {isProcessing ? (
             <>

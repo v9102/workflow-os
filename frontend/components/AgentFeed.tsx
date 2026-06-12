@@ -1,6 +1,6 @@
 "use client"
 
-import { Activity, Loader2, CheckCircle, XCircle, Clock, LayoutDashboard } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, Clock } from "lucide-react"
 
 interface AgentActivity {
   agent_name: string
@@ -19,13 +19,13 @@ const AGENT_ORDER = ["ExtractionAgent", "RiskAgent", "AssignmentAgent", "Reporti
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
     case "running":
-      return <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />
+      return <Loader2 className="w-3.5 h-3.5" style={{ color: "var(--color-accent)" }} />
     case "completed":
       return <CheckCircle className="w-3.5 h-3.5" style={{ color: "var(--color-success)" }} />
     case "failed":
       return <XCircle className="w-3.5 h-3.5" style={{ color: "var(--color-danger)" }} />
     default:
-      return <Clock className="w-4 h-4 text-dark-400" />
+      return <Clock className="w-3.5 h-3.5" style={{ color: "var(--color-ink-muted)" }} />
   }
 }
 
@@ -39,48 +39,58 @@ export function AgentFeed({ activities, isProcessing }: AgentFeedProps) {
   )
 
   return (
-    <div className="bg-white dark:bg-dark-800 rounded-2xl border border-dark-200 dark:border-dark-700 shadow-sm">
-      <div className="flex border-b border-dark-200 dark:border-dark-700">
-        <button
-          onClick={() => setActiveTab("feed")}
-          className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-            activeTab === "feed"
-              ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-500"
-              : "text-dark-500 dark:text-dark-400"
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          Agent Feed
-        </button>
-        <button
-          onClick={() => setActiveTab("dashboard")}
-          className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-            activeTab === "dashboard"
-              ? "text-primary-600 dark:text-primary-400 border-b-2 border-primary-500"
-              : "text-dark-500 dark:text-dark-400"
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          Dashboard
-        </button>
+    <div
+      className="rounded-2xl border overflow-hidden transition-all duration-300"
+      style={{
+        backgroundColor: "var(--color-surface)",
+        borderColor: "var(--color-border)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)",
+      }}
+    >
+      <div className="px-5 py-3.5 border-b flex items-center gap-2" style={{ borderColor: "var(--color-border)" }}>
+        <div className="w-2 h-2 rounded-full" style={{
+          backgroundColor: isProcessing ? "var(--color-accent)" : "var(--color-success)",
+          animation: isProcessing ? "pulseSoft 1.5s ease-in-out infinite" : "none",
+        }} />
+        <span className="text-xs font-medium" style={{ color: "var(--color-ink-muted)" }}>
+          {isProcessing ? "Agents running…" : sorted.length > 0 ? "All agents complete" : "No activity yet"}
+        </span>
       </div>
 
-      <div className="p-4 max-h-96 overflow-y-auto space-y-3">
+      <div className="p-2">
         {activities.length === 0 && isProcessing && (
-          <div className="flex items-center gap-2 text-sm text-dark-500 dark:text-dark-400">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Waiting for agents to start...
+          <div className="flex items-center gap-2 px-3 py-4 text-xs" style={{ color: "var(--color-ink-muted)" }}>
+            <Loader2 className="w-3.5 h-3.5" style={{ color: "var(--color-accent)" }} />
+            Waiting for agents to start…
           </div>
         )}
 
-        {activities.map((activity, index) => (
-          <div key={index} className="flex items-start gap-3">
-            <div className="mt-0.5">
+        {sorted.map((activity, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors"
+            style={{
+              animation: `slideUp 0.3s ease-out ${index * 0.08}s both`,
+            }}
+          >
+            <div className="w-6 h-6 flex items-center justify-center rounded-full" style={{
+              backgroundColor: activity.status === "running"
+                ? "var(--color-accent-subtle)"
+                : activity.status === "completed"
+                  ? "rgba(16, 185, 129, 0.1)"
+                  : activity.status === "failed"
+                    ? "rgba(244, 63, 94, 0.1)"
+                    : "transparent",
+            }}>
               <StatusIcon status={activity.status} />
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-dark-900 dark:text-white">{activity.agent_name}</p>
-              <p className="text-xs text-dark-500 dark:text-dark-400">{activity.message}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" style={{ color: "var(--color-ink)" }}>
+                {activity.agent_name.replace("Agent", "")}
+              </p>
+              <p className="text-xs truncate" style={{ color: "var(--color-ink-muted)" }}>
+                {activity.message}
+              </p>
             </div>
           </div>
         ))}

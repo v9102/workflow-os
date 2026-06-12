@@ -2,45 +2,82 @@ import type { Config } from "tailwindcss"
 
 const config: Config = {
   content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: "#f0f9ff",
-          100: "#e0f2fe",
-          200: "#bae6fd",
-          300: "#7dd3fc",
-          400: "#38bdf8",
-          500: "#0ea5e9",
-          600: "#0284c7",
-          700: "#0369a1",
-          800: "#075985",
-          900: "#0c4a6e",
+        surface: {
+          DEFAULT: "#ffffff",
+          dark: "#1A1A1E",
         },
-        dark: {
-          50: "#f8fafc",
-          100: "#f1f5f9",
-          200: "#e2e8f0",
-          300: "#cbd5e1",
-          400: "#94a3b8",
-          500: "#64748b",
-          600: "#475569",
-          700: "#334155",
-          800: "#1e293b",
-          900: "#0f172a",
-          950: "#020617",
-        }
+        panel: {
+          DEFAULT: "#FAFAF8",
+          dark: "#232329",
+        },
+        border: {
+          DEFAULT: "#E8E8E6",
+          dark: "#2E2E36",
+        },
+        ink: {
+          DEFAULT: "#1A1A1E",
+          dark: "#F1F1F5",
+          muted: "#8B8B93",
+          "dark-muted": "#6B6B76",
+        },
+        accent: {
+          50: "#EEF2FF",
+          100: "#E0E7FF",
+          200: "#C7D2FE",
+          300: "#A5B4FC",
+          400: "#818CF8",
+          500: "#6366F1",
+          600: "#4F46E5",
+          700: "#4338CA",
+        },
+        success: { DEFAULT: "#10B981", light: "#D1FAE5", dark: "#065F46" },
+        warning: { DEFAULT: "#F59E0B", light: "#FEF3C7", dark: "#92400E" },
+        danger: { DEFAULT: "#F43F5E", light: "#FFE4E6", dark: "#9F1239" },
+      },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        display: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+      },
+      fontSize: {
+        "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+      },
+      borderRadius: {
+        "2xl": "1rem",
+        "3xl": "1.25rem",
+      },
+      boxShadow: {
+        soft: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)",
+        "soft-lg": "0 4px 16px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.02)",
       },
       animation: {
-        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "spin-slow": "spin 2s linear infinite",
-      }
+        "fade-in": "fadeIn 0.5s ease-out",
+        "slide-up": "slideUp 0.4s ease-out",
+        "pulse-soft": "pulseSoft 2s ease-in-out infinite",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        slideUp: {
+          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        pulseSoft: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
+      },
     },
   },
   plugins: [],
 }
+
 export default config

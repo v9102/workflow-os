@@ -1,5 +1,7 @@
 import json
+import os
 from typing import Optional
+from openai import AzureOpenAI
 from ..schemas.models import ExtractionResult, TaskItem
 from .llm import get_client, get_deployment
 
@@ -47,13 +49,16 @@ class ExtractionAgent:
         )
         self._deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
-    async def extract(self, transcript: str) -> ExtractionResult:
+    async def extract(self, transcript: str, context_hint: str = "") -> ExtractionResult:
         self._ensure_client()
+        prompt = EXTRACTION_PROMPT
+        if context_hint:
+            prompt += f"\n\nAdditional context: {context_hint}"
         try:
             response = self._client.chat.completions.create(
                 model=self._deployment,
                 messages=[
-                    {"role": "system", "content": EXTRACTION_PROMPT},
+                    {"role": "system", "content": prompt},
                     {"role": "user", "content": transcript}
                 ],
                 temperature=0.1,
@@ -79,7 +84,5 @@ class ExtractionAgent:
                 deadline=t.get("deadline"),
                 dependencies=t.get("dependencies", []),
                 decision=t.get("decision")
-            )
-            for i, t in enumerate(result.get("tasks", []))
-        ]
+            ))
         return ExtractionResult(tasks=tasks, decisions=result.get("decisions", []))
