@@ -4,7 +4,7 @@ import os
 
 from openai import AzureOpenAI
 
-from ..schemas.models import ExtractionResult, TaskItem
+from schemas.models import ExtractionResult, TaskItem
 
 logger = logging.getLogger(__name__)
 

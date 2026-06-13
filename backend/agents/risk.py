@@ -2,7 +2,7 @@ import json
 import os
 from typing import List
 from openai import AzureOpenAI
-from ..schemas.models import TaskItem, RiskAssessment, RiskLevel
+from schemas.models import TaskItem, RiskAssessment, RiskLevel
 
 
 RISK_PROMPT = """

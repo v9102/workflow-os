@@ -1,6 +1,6 @@
 from collections import defaultdict
 from typing import List
-from ..schemas.models import TaskItem, RiskLevel, ValidationIssue
+from schemas.models import TaskItem, RiskLevel, ValidationIssue
 
 
 class ValidatorAgent:

@@ -32,7 +32,7 @@ async def log_audit(
 
     if store_db:
         try:
-            from . import db
+            import db
             await db.save_audit_entry(session_id, entry)
         except Exception as e:
             logger.warning("Audit DB write failed: %s", e)

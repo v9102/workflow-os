@@ -3,7 +3,7 @@ import os
 import re
 from typing import List
 from openai import AzureOpenAI
-from ..schemas.models import TaskItem, AssignmentResult
+from schemas.models import TaskItem, AssignmentResult
 
 
 ASSIGNMENT_PROMPT = """

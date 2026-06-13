@@ -10,17 +10,17 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 
-from .schemas.models import (
+from schemas.models import (
     TranscriptResponse, DashboardResponse, AgentActivity, ExecutionDashboard,
     RetryRequest, SCHEMA_VERSION
 )
-from .agents.orchestrator import OrchestratorAgent
-from . import db
-from . import audit
-from . import webhooks
-from .validation import sanitize_transcript, validate_transcript
-from .middleware import RateLimitMiddleware
-from .m365 import graph_client
+from agents.orchestrator import OrchestratorAgent
+import db
+import audit
+import webhooks
+from validation import sanitize_transcript, validate_transcript
+from middleware import RateLimitMiddleware
+from m365 import graph_client
 
 load_dotenv()
 

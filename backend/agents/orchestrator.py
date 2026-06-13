@@ -2,15 +2,15 @@ import re
 import time
 import uuid
 from typing import Callable, Awaitable, List, Optional
-from ..schemas.models import (
+from schemas.models import (
     TaskItem, ExecutionDashboard, AgentActivity, AgentStatus
 )
-from ..utils import with_retry
-from .extraction import ExtractionAgent
-from .risk import RiskAgent
-from .assignment import AssignmentAgent
-from .reporting import ReportingAgent
-from .validator import ValidatorAgent
+from utils import with_retry
+from agents.extraction import ExtractionAgent
+from agents.risk import RiskAgent
+from agents.assignment import AssignmentAgent
+from agents.reporting import ReportingAgent
+from agents.validator import ValidatorAgent
 
 SHORT_TRANSCRIPT_WORDS = 100
 

@@ -1,7 +1,7 @@
 import json
 from typing import List
-from ..schemas.models import TaskItem, ExecutionDashboard
-from .llm import get_client, get_deployment
+from schemas.models import TaskItem, ExecutionDashboard
+from agents.llm import get_client, get_deployment
 
 
 REPORTING_PROMPT = """
