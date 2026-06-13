@@ -1,90 +1,19 @@
-name: Deploy to Azure
+name: Deploy to Azure Web App
 
 on:
   push:
     branches: [main]
 
 jobs:
-  build-and-deploy:
+  deploy-backend:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check deployment configuration
-        id: deploy-config
-        env:
-          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-        run: |
-          missing_secrets=()
-
-          for secret_name in ACR_REGISTRY ACR_USERNAME ACR_PASSWORD; do
-            if [ -z "${!secret_name}" ]; then
-              missing_secrets+=("${secret_name}")
-            fi
-          done
-
-          if [ "${#missing_secrets[@]}" -gt 0 ]; then
-            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping deploy because required secrets are missing: ${missing_secrets[*]}"
-          else
-            echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set up Docker Buildx
-        if: steps.deploy-config.outputs.deploy_enabled == 'true'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Azure Container Registry
-        if: steps.deploy-config.outputs.deploy_enabled == 'true'
-        uses: docker/login-action@v3
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
         with:
-          registry: ${{ secrets.ACR_REGISTRY }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-
-      - name: Build and push backend
-        if: steps.deploy-config.outputs.deploy_enabled == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: backend/Dockerfile
-          push: true
-          tags: ${{ secrets.ACR_REGISTRY }}/workflowos-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push frontend
-        if: steps.deploy-config.outputs.deploy_enabled == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: frontend
-          file: frontend/Dockerfile
-          push: true
-          tags: ${{ secrets.ACR_REGISTRY }}/workflowos-frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy backend to Azure Container Apps
-        if: steps.deploy-config.outputs.deploy_enabled == 'true'
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          imageToDeploy: ${{ secrets.ACR_REGISTRY }}/workflowos-backend:latest
-          containerAppName: workflowos-backend
-          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP || 'workflowos-rg' }}
-          registryUrl: ${{ secrets.ACR_REGISTRY }}
-          registryUsername: ${{ secrets.ACR_USERNAME }}
-          registryPassword: ${{ secrets.ACR_PASSWORD }}
-
-      - name: Deploy frontend to Azure Container Apps
-        if: steps.deploy-config.outputs.deploy_enabled == 'true'
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          imageToDeploy: ${{ secrets.ACR_REGISTRY }}/workflowos-frontend:latest
-          containerAppName: workflowos-frontend
-          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP || 'workflowos-rg' }}
-          registryUrl: ${{ secrets.ACR_REGISTRY }}
-          registryUsername: ${{ secrets.ACR_USERNAME }}
-          registryPassword: ${{ secrets.ACR_PASSWORD }}
+          app-name: workflowos-api
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: backend
