@@ -46,7 +46,7 @@ jobs:
         with:
           imageToDeploy: ${{ secrets.ACR_REGISTRY }}/workflowos-backend:latest
           containerAppName: workflowos-backend
-          resourceGroup: workflowos-rg
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP || 'workflowos-rg' }}
           registryUrl: ${{ secrets.ACR_REGISTRY }}
           registryUsername: ${{ secrets.ACR_USERNAME }}
           registryPassword: ${{ secrets.ACR_PASSWORD }}
@@ -56,7 +56,7 @@ jobs:
         with:
           imageToDeploy: ${{ secrets.ACR_REGISTRY }}/workflowos-frontend:latest
           containerAppName: workflowos-frontend
-          resourceGroup: workflowos-rg
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP || 'workflowos-rg' }}
           registryUrl: ${{ secrets.ACR_REGISTRY }}
           registryUsername: ${{ secrets.ACR_USERNAME }}
           registryPassword: ${{ secrets.ACR_PASSWORD }}
