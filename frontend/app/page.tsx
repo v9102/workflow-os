@@ -157,7 +157,7 @@ export default function Home() {
       }, 2200)
     }
     return () => clearInterval(interval)
-  }, [processState])
+  }, [processState, loadingTexts.length])
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text)
@@ -255,7 +255,7 @@ export default function Home() {
     }
     setSwarmAgents(prev => prev.map(a => ({ ...a, status: 'completed' as const })))
     applyFallback()
-  }, [sessionId, transcript, meetingId])
+  }, [applyFallback])
 
   const handleSSEError = useCallback((err: string) => {
     console.warn('SSE error:', err)
@@ -290,7 +290,7 @@ export default function Home() {
     })
   }, [transcript, meetingId])
 
-  const processTranscript = async () => {
+  const processTranscript = useCallback(async () => {
     if (!transcript.trim()) return
     setProcessState('processing')
     setSwarmDuration(0)
@@ -335,7 +335,7 @@ export default function Home() {
         applyFallback()
       }, 3000)
     }
-  }
+  }, [transcript, meetingId, applyFallback])
 
   useEffect(() => {
     if (!transcript.trim()) {
@@ -350,7 +350,7 @@ export default function Home() {
     "Ctrl+Enter": () => {
       if (processState !== 'processing' && transcript.trim().length >= 10) processTranscript()
     },
-  }), [processState, transcript])
+  }), [processState, transcript, processTranscript])
 
   useKeyboardShortcuts(shortcuts, processState !== 'processing')
 
