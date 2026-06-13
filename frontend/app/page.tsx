@@ -246,6 +246,27 @@ export default function Home() {
     }
   }, [sessionId, transcript, meetingId, fetchDashboard])
 
+  const applyFallback = useCallback(() => {
+    const matchingPreset = PRESET_MEETINGS.find(p => p.transcript === transcript)
+    const fallbackPlan = matchingPreset ? matchingPreset.plan : PRESET_MEETINGS[0].plan
+    setAnalyzedPlan(fallbackPlan)
+    setActiveTab('dashboard')
+
+    const fallbackItem = {
+      id: meetingId || 'Meeting_ID_4920',
+      name: matchingPreset?.name || 'DevOps Fallback Sync Plan',
+      transcript,
+      plan: fallbackPlan,
+      date: 'Just now',
+    }
+
+    setHistoryList((prev) => {
+      const updated = [fallbackItem, ...prev.filter(h => h.id !== fallbackItem.id)]
+      localStorage.setItem('workflow_os_history', JSON.stringify(updated))
+      return updated
+    })
+  }, [transcript, meetingId])
+
   const handleSSETimeout = useCallback(() => {
     setProcessState('completed')
     setSseEnabled(false)
@@ -268,27 +289,6 @@ export default function Home() {
     onError: handleSSEError,
     enabled: sseEnabled,
   })
-
-  const applyFallback = useCallback(() => {
-    const matchingPreset = PRESET_MEETINGS.find(p => p.transcript === transcript)
-    const fallbackPlan = matchingPreset ? matchingPreset.plan : PRESET_MEETINGS[0].plan
-    setAnalyzedPlan(fallbackPlan)
-    setActiveTab('dashboard')
-
-    const fallbackItem = {
-      id: meetingId || 'Meeting_ID_4920',
-      name: matchingPreset?.name || 'DevOps Fallback Sync Plan',
-      transcript,
-      plan: fallbackPlan,
-      date: 'Just now',
-    }
-
-    setHistoryList((prev) => {
-      const updated = [fallbackItem, ...prev.filter(h => h.id !== fallbackItem.id)]
-      localStorage.setItem('workflow_os_history', JSON.stringify(updated))
-      return updated
-    })
-  }, [transcript, meetingId])
 
   const processTranscript = useCallback(async () => {
     if (!transcript.trim()) return
