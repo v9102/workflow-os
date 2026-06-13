@@ -9,3 +9,4 @@ out/
 *.tsbuildinfo
 .DS_Store
 audit.log
+node_modules_broken
