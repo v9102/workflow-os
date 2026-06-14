@@ -191,11 +191,11 @@ Even short stand-up transcripts are handled — the system detects brief meeting
 
 ## Try It Yourself
 
-### Option A: Just Watch the Demo
-1. Go to `http://localhost:3000`
+### Option A: Just Watch the Demo (live)
+1. Go to **https://workflowos-seven.vercel.app** (or `http://localhost:3000` locally)
 2. Click **"Load sample"**
 3. Click **"Process Transcript"**
-4. Watch the agents work in real time
+4. Watch the agents work in real time — they run against the live Azure OpenAI backend at `https://workflowos-api.azurewebsites.net`
 
 ### Option B: Use Your Own Transcript
 1. Copy a real meeting transcript (or type one)

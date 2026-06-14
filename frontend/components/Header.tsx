@@ -86,7 +86,7 @@ export function Header({
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
             )}
             <span className="text-[9px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-semibold font-mono">
-              {apiChecking ? 'Checking...' : hasApiKey ? 'Gemini 3.5' : 'Offline Engine'}
+              {apiChecking ? 'Checking...' : hasApiKey ? 'GPT-4o' : 'Offline Engine'}
             </span>
           </div>
 

@@ -99,7 +99,7 @@ export default function Home() {
   const [hasApiKey, setHasApiKey] = useState(false)
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; time: string }>>([
     { id: '1', text: 'Swarm agent cluster rebooted successfully', time: 'Just now' },
-    { id: '2', text: 'New analysis model 3.5 Flash online', time: '5m ago' }
+    { id: '2', text: 'Azure OpenAI GPT-4o model online', time: '5m ago' }
   ])
   const [showNotifications, setShowNotifications] = useState(false)
   const [copiedText, setCopiedText] = useState<string | null>(null)
@@ -506,7 +506,7 @@ export default function Home() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
-                { icon: Cpu, name: '1. Extraction Agent', desc: 'Leverages the high scalability parameters of Gemini 2.5 Flash to automatically clean up speech-to-text transcripts, discard vocal delays, isolate individual speakers, and extract the relevant key discussion context maps.' },
+                { icon: Cpu, name: '1. Extraction Agent', desc: 'Leverages the high scalability parameters of Azure OpenAI GPT-4o to automatically clean up speech-to-text transcripts, discard vocal delays, isolate individual speakers, and extract the relevant key discussion context maps.' },
                 { icon: Activity, name: '2. Risk Intelligence', desc: 'Scours through the compiled discussions to check for deadlines, security conflicts, platform bottlenecks, geographical latency rules, or conflicting developer mandates, ranking risks intelligently.' },
                 { icon: Users, name: '3. Task Assignment', desc: 'Assigns individual owners to extracted sprint goals based on historical tags and team names. Auto generates developer profile initials, dates of completion, and priority level weight targets easily.' },
                 { icon: Database, name: '4. Auto-Reporting', desc: 'Translates complete structural plans into styled linear timeline checkpoints, multi-tiered dependency chain layouts, executive summary paragraphs, and interactive spreadsheet tables instantly.' },
