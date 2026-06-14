@@ -1,3 +1,4 @@
+import asyncio
 import re
 import time
 import uuid
@@ -6,6 +7,7 @@ from schemas.models import (
     TaskItem, ExecutionDashboard, AgentActivity, AgentStatus
 )
 from utils import with_retry
+import db
 from agents.extraction import ExtractionAgent
 from agents.risk import RiskAgent
 from agents.assignment import AssignmentAgent
@@ -60,18 +62,18 @@ class OrchestratorAgent:
             "run_assignment": run_assignment,
         }
 
-    async def _run_risk(self, tasks: List[TaskItem], transcript: str):
+    async def _run_risk(self, tasks: List[TaskItem], transcript: str, prior_context: Optional[List[dict]] = None):
         await self._emit_activity("Risk Agent", AgentStatus.RUNNING, "Assessing execution risks")
-        risk_assessments = await with_retry(self.risk_agent.assess_risks, tasks, transcript)
+        risk_assessments = await with_retry(self.risk_agent.assess_risks, tasks, transcript, prior_context=prior_context)
         risk_map = {ra.task_id: ra for ra in risk_assessments}
         for i, task in enumerate(tasks):
             if str(i) in risk_map:
                 task.risk = risk_map[str(i)].risk
         await self._emit_activity("Risk Agent", AgentStatus.COMPLETED, f"Assessed risks for {len(risk_map)} tasks")
 
-    async def _run_assignment(self, tasks: List[TaskItem], transcript: str):
+    async def _run_assignment(self, tasks: List[TaskItem], transcript: str, prior_context: Optional[List[dict]] = None):
         await self._emit_activity("Assignment Agent", AgentStatus.RUNNING, "Assigning task owners")
-        assignments = await with_retry(self.assignment_agent.assign_owners, tasks, transcript)
+        assignments = await with_retry(self.assignment_agent.assign_owners, tasks, transcript, prior_context=prior_context)
         assignment_map = {a.task_id: a for a in assignments}
         for i, task in enumerate(tasks):
             if str(i) in assignment_map:
@@ -88,6 +90,20 @@ class OrchestratorAgent:
         skipped = [name for name, run in [("Risk", route["run_risk"]), ("Assignment", route["run_assignment"])] if not run]
         route_msg = "Routing full pipeline" if not skipped else f"Dynamic routing: skipping {', '.join(skipped)}"
         await self._emit_activity("Orchestrator", AgentStatus.RUNNING, f"Starting workflow pipeline. {route_msg}")
+
+        # Cross-meeting swarm memory: pull prior completed meetings so Risk,
+        # Assignment, and the Validator can coordinate across transcripts.
+        prior_context: List[dict] = []
+        try:
+            prior_context = await db.get_prior_context(exclude_session_id=transcript_id)
+        except Exception:
+            prior_context = []
+        if prior_context:
+            prior_meetings = len({p["meeting_id"] for p in prior_context})
+            await self._emit_activity(
+                "Orchestrator", AgentStatus.RUNNING,
+                f"Swarm memory: loaded {len(prior_context)} tasks from {prior_meetings} prior meeting(s) for cross-meeting analysis"
+            )
 
         await self._emit_activity("Extraction Agent", AgentStatus.RUNNING, "Extracting tasks and decisions")
         extraction_result = await with_retry(self.extraction_agent.extract, transcript)
@@ -115,30 +131,40 @@ class OrchestratorAgent:
                             task.deadline = match.deadline
                 await self._emit_activity("Extraction Agent", AgentStatus.COMPLETED, "Deadline re-scan complete")
 
-            await self._run_risk(tasks, transcript)
+            await self._run_risk(tasks, transcript, prior_context)
 
         if route["run_assignment"] and tasks:
-            await self._run_assignment(tasks, transcript)
+            await self._run_assignment(tasks, transcript, prior_context)
 
+        # Parallel validation sidecar: Reporting (LLM call) and the Validator
+        # (in-process checks) run concurrently — the Validator computes while
+        # Reporting awaits the network, instead of strictly after it.
         await self._emit_activity("Reporting Agent", AgentStatus.RUNNING, "Generating execution dashboard")
-        dashboard = await with_retry(self.reporting_agent.generate_dashboard, transcript_id, tasks, transcript)
-        await self._emit_activity("Reporting Agent", AgentStatus.COMPLETED, "Dashboard generated")
+        await self._emit_activity("Validator Agent", AgentStatus.RUNNING, "Cross-checking owners, deadlines, and risk scores (parallel sidecar)")
 
-        await self._emit_activity("Validator Agent", AgentStatus.RUNNING, "Cross-checking owners, deadlines, and risk scores")
-        issues = await self.validator_agent.validate(tasks, route["speakers"])
+        async def _report():
+            result = await with_retry(self.reporting_agent.generate_dashboard, transcript_id, tasks, transcript)
+            await self._emit_activity("Reporting Agent", AgentStatus.COMPLETED, "Dashboard generated")
+            return result
+
+        async def _validate():
+            result = await self.validator_agent.validate(tasks, route["speakers"], prior_context)
+            await self._emit_activity("Validator Agent", AgentStatus.COMPLETED, f"Found {len(result)} issues")
+            return result
+
+        dashboard, issues = await asyncio.gather(_report(), _validate())
         dashboard.validation_issues = issues
-        await self._emit_activity("Validator Agent", AgentStatus.COMPLETED, f"Found {len(issues)} issues")
 
         if issues:
             issue_types = {i.issue_type for i in issues}
             if route["run_assignment"] and "unowned_task" in issue_types:
                 await self._emit_activity("Orchestrator", AgentStatus.RUNNING, "Correction pass: re-running Assignment for unowned tasks")
-                await self._run_assignment(tasks, transcript)
+                await self._run_assignment(tasks, transcript, prior_context)
             if route["run_risk"] and "missing_risk_score" in issue_types:
                 await self._emit_activity("Orchestrator", AgentStatus.RUNNING, "Correction pass: re-running Risk for unscored tasks")
-                await self._run_risk(tasks, transcript)
+                await self._run_risk(tasks, transcript, prior_context)
             if route["run_assignment"] and ("unowned_task" in issue_types or "missing_risk_score" in issue_types):
-                dashboard.validation_issues = await self.validator_agent.validate(tasks, route["speakers"])
+                dashboard.validation_issues = await self.validator_agent.validate(tasks, route["speakers"], prior_context)
 
         await self._emit_activity("Orchestrator", AgentStatus.COMPLETED, "Workflow complete")
 

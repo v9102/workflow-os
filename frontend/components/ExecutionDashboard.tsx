@@ -92,6 +92,42 @@ export function ExecutionDashboard({ plan, onUpdatePlan, copiedText, onCopy }: E
         </AnimatePresence>
       </div>
 
+      {plan.validationIssues && plan.validationIssues.length > 0 && (
+        <div className="bg-[#E5E2DD] dark:bg-[#1C1A19] border border-[#1A1A1A]/10 dark:border-[#EAE6DF]/10 p-5 text-left">
+          <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#1A1A1A]/5 dark:border-[#EAE6DF]/5">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500" />
+              <h3 className="font-serif italic text-base text-[#1A1A1A] dark:text-[#EAE6DF]">Validator &amp; Swarm Coordination</h3>
+            </div>
+            <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">{plan.validationIssues.length} flag{plan.validationIssues.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="space-y-2">
+            {plan.validationIssues.map((issue, i) => {
+              const isCrossMeeting = issue.issueType === "cross_meeting_conflict"
+              return (
+                <div
+                  key={i}
+                  className={`flex items-start gap-2.5 p-2.5 border text-[12px] ${
+                    isCrossMeeting
+                      ? "bg-amber-500/10 border-amber-500/40 dark:border-amber-500/30"
+                      : "bg-[#F4F1ED] dark:bg-[#121110] border-[#1A1A1A]/5 dark:border-[#EAE6DF]/5"
+                  }`}
+                >
+                  <span className={`shrink-0 mt-0.5 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 border ${
+                    isCrossMeeting
+                      ? "bg-amber-500 text-white border-transparent"
+                      : "bg-transparent text-stone-500 dark:text-stone-400 border-[#1A1A1A]/15 dark:border-[#EAE6DF]/15"
+                  }`}>
+                    {issue.issueType.replace(/_/g, " ")}
+                  </span>
+                  <span className="text-stone-700 dark:text-stone-300 leading-relaxed">{issue.detail}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
         <div className="bg-[#E5E2DD] dark:bg-[#1C1A19] p-5 border border-[#1A1A1A]/10 dark:border-[#EAE6DF]/10">
           <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#1A1A1A]/5 dark:border-[#EAE6DF]/5">

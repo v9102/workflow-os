@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import List
+from typing import List, Optional
 from openai import AzureOpenAI
 from schemas.models import TaskItem, AssignmentResult
 
@@ -50,7 +50,12 @@ class AssignmentAgent:
     def _extract_speakers(self, transcript: str) -> List[str]:
         return list(set(re.findall(r'^(\w+):\s', transcript, re.MULTILINE)))
 
-    async def assign_owners(self, tasks: List[TaskItem], transcript: str) -> List[AssignmentResult]:
+    async def assign_owners(
+        self,
+        tasks: List[TaskItem],
+        transcript: str,
+        prior_context: Optional[List[dict]] = None,
+    ) -> List[AssignmentResult]:
         self._ensure_client()
         speakers = self._extract_speakers(transcript)
         speaker_context = f"Identified speakers: {', '.join(speakers)}" if speakers else "No clear speakers identified"
@@ -58,6 +63,20 @@ class AssignmentAgent:
         task_descriptions = [f"{i}: {t.task}" for i, t in enumerate(tasks)]
 
         user_prompt = f"{speaker_context}\n\nTranscript:\n{transcript[:4000]}\n\nTasks:\n" + "\n".join(task_descriptions)
+
+        # Cross-meeting swarm memory: balance workload — prefer owners who are
+        # less loaded across prior meetings when the transcript is ambiguous.
+        if prior_context:
+            load: dict[str, int] = {}
+            for p in prior_context:
+                load[p["owner"]] = load.get(p["owner"], 0) + 1
+            if load:
+                load_lines = [f"- {owner}: {count} open task(s)" for owner, count in sorted(load.items(), key=lambda x: -x[1])]
+                user_prompt += (
+                    "\n\nCurrent workload from prior meetings (when ownership is "
+                    "ambiguous, prefer balancing toward less-loaded people):\n"
+                    + "\n".join(load_lines)
+                )
 
         response = self.client.chat.completions.create(
             model=self.deployment,

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List
+from typing import List, Optional
 from openai import AzureOpenAI
 from schemas.models import TaskItem, RiskAssessment, RiskLevel
 
@@ -50,12 +50,30 @@ class RiskAgent:
         )
         self.deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
-    async def assess_risks(self, tasks: List[TaskItem], transcript: str) -> List[RiskAssessment]:
+    async def assess_risks(
+        self,
+        tasks: List[TaskItem],
+        transcript: str,
+        prior_context: Optional[List[dict]] = None,
+    ) -> List[RiskAssessment]:
         self._ensure_client()
-        task_descriptions = [f"{i}: {t.task} (deadline: {t.deadline or 'none'}, deps: {t.dependencies})" 
+        task_descriptions = [f"{i}: {t.task} (deadline: {t.deadline or 'none'}, deps: {t.dependencies})"
                            for i, t in enumerate(tasks)]
 
         user_prompt = f"Transcript context:\n{transcript[:3000]}\n\nTasks:\n" + "\n".join(task_descriptions)
+
+        # Cross-meeting swarm memory: existing commitments raise risk for an
+        # already-loaded owner (workload contention across meetings).
+        if prior_context:
+            prior_lines = [
+                f"- {p['owner']} owns '{p['task']}' (due {p.get('deadline') or 'n/a'}) from meeting {p['meeting_id']}"
+                for p in prior_context[:15]
+            ]
+            user_prompt += (
+                "\n\nExisting commitments from prior meetings (treat an owner who "
+                "is already heavily loaded, or who has a clashing deadline, as "
+                "higher risk):\n" + "\n".join(prior_lines)
+            )
 
         response = self.client.chat.completions.create(
             model=self.deployment,

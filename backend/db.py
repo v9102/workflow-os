@@ -130,5 +130,48 @@ async def list_sessions() -> list[dict]:
     return [{"id": k, "status": v.get("status"), SCHEMA_VERSION_KEY: v.get(SCHEMA_VERSION_KEY)} for k, v in _in_memory_store.items()]
 
 
+async def get_prior_context(exclude_session_id: str = "", limit: int = 5) -> list[dict]:
+    """Cross-meeting swarm memory: return tasks from previously completed
+    sessions so downstream agents can reason across meetings (workload
+    balancing, cross-meeting deadline conflicts). Returns [] when there is no
+    prior history — keeping single-meeting behavior unchanged."""
+    prior: list[dict] = []
+
+    def _extract(session_id: str, data: dict) -> None:
+        if session_id == exclude_session_id:
+            return
+        if data.get("status") != "completed":
+            return
+        dashboard = data.get("dashboard") or {}
+        tasks = dashboard.get("tasks") or []
+        for t in tasks:
+            owner = t.get("owner")
+            if not owner or owner == "Unassigned":
+                continue
+            prior.append({
+                "meeting_id": session_id,
+                "task": t.get("task", ""),
+                "owner": owner,
+                "deadline": t.get("deadline"),
+                "risk": t.get("risk"),
+            })
+
+    container = _container()
+    if container:
+        try:
+            items = container.query_items(
+                "SELECT c.id, c.status, c.dashboard FROM c WHERE c.status = 'completed'",
+            )
+            for item in items:
+                _extract(item.get("id", ""), item)
+        except Exception:
+            return []
+    else:
+        for sid, data in list(_in_memory_store.items())[-limit - 1:]:
+            _extract(sid, data)
+
+    return prior
+
+
 async def check_schema_version() -> str:
     return "1.0.0"

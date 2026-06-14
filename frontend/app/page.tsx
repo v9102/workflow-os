@@ -72,6 +72,12 @@ function convertBackendDashboard(data: BackendDashboard): ParsedPlan {
     title: item.task,
   }))
 
+  const validationIssues = (data.validation_issues || []).map(v => ({
+    taskId: v.task_id,
+    issueType: v.issue_type,
+    detail: v.detail,
+  }))
+
   return {
     executiveSummary: data.summary || "Analysis complete.",
     dependencyChains: deps,
@@ -82,6 +88,7 @@ function convertBackendDashboard(data: BackendDashboard): ParsedPlan {
       { id: "t1", time: "08:00 AM", status: "COMPLETE", title: "Environment Provisioning" },
     ],
     tasks,
+    validationIssues,
   }
 }
 

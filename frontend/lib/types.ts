@@ -42,10 +42,17 @@ export interface TaskItem {
   risk: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
+export interface ValidationIssue {
+  taskId: string;
+  issueType: string;
+  detail: string;
+}
+
 export interface ParsedPlan {
   executiveSummary: string;
   dependencyChains: DependencyChain[];
   risks: RiskItem[];
   timeline: TimelineItem[];
   tasks: TaskItem[];
+  validationIssues?: ValidationIssue[];
 }
