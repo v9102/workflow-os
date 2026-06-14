@@ -172,6 +172,30 @@ export default function Home() {
     setTimeout(() => setCopiedText(null), 2000)
   }
 
+  const exportToOutlook = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
+    if (!sessionId) return { ok: false, message: "No active session to export." }
+    try {
+      const res = await fetch(`${API_URL}/api/export/outlook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        return { ok: false, message: data?.detail || "Outlook export failed." }
+      }
+      if (data.status === "not_configured") {
+        return {
+          ok: true,
+          message: `${data.would_create ?? 0} deadline event(s) prepared. Connect Microsoft 365 to push them to Outlook.`,
+        }
+      }
+      return { ok: true, message: `Added ${data.created ?? 0} deadline event(s) to Outlook.` }
+    } catch {
+      return { ok: false, message: "Could not reach the export service." }
+    }
+  }, [sessionId])
+
   const fetchDashboard = useCallback(async (sid: string) => {
     try {
       const res = await fetch(`${API_URL}/api/dashboard/${sid}`)
@@ -501,6 +525,7 @@ export default function Home() {
               onUpdatePlan={updatePlan}
               copiedText={copiedText}
               onCopy={copyToClipboard}
+              onExportOutlook={exportToOutlook}
             />
           </div>
         )}

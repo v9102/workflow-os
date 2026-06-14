@@ -12,6 +12,12 @@ class MicrosoftGraphClient:
         self.tenant_id = os.getenv("MICROSOFT_TENANT_ID")
         self._token: Optional[str] = None
 
+    def is_configured(self) -> bool:
+        """True when Microsoft 365 / Entra ID credentials are present so the
+        Graph calls can actually run. Lets export endpoints degrade gracefully
+        instead of 500-ing when M365 isn't wired up."""
+        return bool(self.client_id and self.client_secret and self.tenant_id)
+
     async def _get_token(self) -> str:
         if self._token:
             return self._token
@@ -56,6 +62,37 @@ class MicrosoftGraphClient:
         body = {"body": {"content": message}}
         async with httpx.AsyncClient() as client:
             resp = await client.post(url, headers=headers, json=body)
+            resp.raise_for_status()
+            return resp.json()
+
+    async def create_calendar_event(
+        self,
+        user_id: str,
+        subject: str,
+        start_iso: str,
+        end_iso: str,
+        body: str = "",
+        timezone: str = "UTC",
+    ) -> dict:
+        """Create an Outlook calendar event (deadline reminder) for a task via
+        Microsoft Graph. user_id is the target mailbox (UPN or object id),
+        required for app-only auth."""
+        token = await self._get_token()
+        url = f"{GRAPH_API_BASE}/users/{user_id}/events"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        event = {
+            "subject": subject,
+            "body": {"contentType": "HTML", "content": body},
+            "start": {"dateTime": start_iso, "timeZone": timezone},
+            "end": {"dateTime": end_iso, "timeZone": timezone},
+            "isReminderOn": True,
+            "reminderMinutesBeforeStart": 60,
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, headers=headers, json=event)
             resp.raise_for_status()
             return resp.json()
 

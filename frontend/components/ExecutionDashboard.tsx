@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import {
-  Check, ChevronDown, Layers, AlertTriangle, ArrowRight, Search, Plus, Copy, FileText, Trash2, ExternalLink
+  Check, ChevronDown, Layers, AlertTriangle, ArrowRight, Search, Plus, Copy, FileText, Trash2, ExternalLink, CalendarPlus
 } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import type { ParsedPlan, TaskItem } from "@/lib/types"
@@ -12,9 +12,10 @@ interface ExecutionDashboardProps {
   onUpdatePlan: (plan: ParsedPlan) => void
   copiedText: string | null
   onCopy: (text: string, label: string) => void
+  onExportOutlook?: () => Promise<{ ok: boolean; message: string }>
 }
 
-export function ExecutionDashboard({ plan, onUpdatePlan, copiedText, onCopy }: ExecutionDashboardProps) {
+export function ExecutionDashboard({ plan, onUpdatePlan, copiedText, onCopy, onExportOutlook }: ExecutionDashboardProps) {
   const [isExecSummaryOpen, setIsExecSummaryOpen] = useState(true)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [taskSearch, setTaskSearch] = useState("")
@@ -22,6 +23,19 @@ export function ExecutionDashboard({ plan, onUpdatePlan, copiedText, onCopy }: E
   const [newTaskOwner, setNewTaskOwner] = useState("")
   const [newTaskRisk, setNewTaskRisk] = useState<"LOW" | "MEDIUM" | "HIGH">("LOW")
   const [newTaskDeadline, setNewTaskDeadline] = useState("Oct 26")
+  const [outlookStatus, setOutlookStatus] = useState<"idle" | "exporting" | "done">("idle")
+  const [outlookMsg, setOutlookMsg] = useState<string>("")
+
+  const deadlineCount = plan.tasks.filter((t) => t.deadline && t.deadline !== "TBD").length
+
+  const handleExportOutlook = async () => {
+    if (!onExportOutlook || outlookStatus === "exporting") return
+    setOutlookStatus("exporting")
+    const result = await onExportOutlook()
+    setOutlookMsg(result.message)
+    setOutlookStatus("done")
+    setTimeout(() => setOutlookStatus("idle"), 5000)
+  }
 
   const addCustomTask = (e: React.FormEvent) => {
     e.preventDefault()
@@ -318,6 +332,46 @@ export function ExecutionDashboard({ plan, onUpdatePlan, copiedText, onCopy }: E
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="bg-[#E5E2DD] dark:bg-[#1C1A19] p-5 border border-[#1A1A1A]/10 dark:border-[#EAE6DF]/10 text-left">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <ExternalLink className="w-4 h-4 text-stone-700 dark:text-stone-400" />
+            <h3 className="font-serif italic text-base text-[#1A1A1A] dark:text-[#EAE6DF]">Export &amp; Integrate</h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => onCopy(
+                "| Task | Owner | Deadline | Risk |\n|---|---|---|---|\n" +
+                plan.tasks.map((t) => `| ${t.title} | ${t.owner} | ${t.deadline} | ${t.risk} |`).join("\n"),
+                "md"
+              )}
+              className="flex items-center gap-1.5 px-3 py-2 border border-[#1A1A1A]/10 dark:border-[#EAE6DF]/10 hover:bg-stone-200 dark:hover:bg-[#121110] transition-colors text-[10px] uppercase tracking-widest font-bold text-stone-700 dark:text-stone-300"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedText === "md" ? "Copied ✓" : "Copy Markdown"}</span>
+            </button>
+            <button
+              onClick={handleExportOutlook}
+              disabled={outlookStatus === "exporting"}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#1A1A1A] dark:bg-[#EAE6DF] text-white dark:text-[#1A1A1A] hover:opacity-90 transition-opacity text-[10px] uppercase tracking-widest font-bold disabled:opacity-50"
+              title="Create Outlook calendar reminders for every task deadline"
+            >
+              <CalendarPlus className="w-3.5 h-3.5" />
+              <span>
+                {outlookStatus === "exporting"
+                  ? "Exporting…"
+                  : `Add ${deadlineCount} to Outlook`}
+              </span>
+            </button>
+          </div>
+        </div>
+        {outlookStatus === "done" && outlookMsg && (
+          <p className="mt-3 text-[12px] text-stone-600 dark:text-stone-400 font-serif italic border-t border-[#1A1A1A]/5 dark:border-[#EAE6DF]/5 pt-3">
+            {outlookMsg}
+          </p>
+        )}
       </div>
     </section>
   )

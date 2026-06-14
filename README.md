@@ -70,7 +70,7 @@ This project is built end-to-end on the Microsoft cloud. The table below is the 
 | **Azure Cosmos DB** (NoSQL) | `backend/db.py` | Persistent swarm memory — session state and audit entries. Falls back to an in-memory store when no connection string is set. | Optional |
 | **Azure Service Bus** | `backend/feedback.py` | Async feedback queue for agent-to-agent reprocessing signals routed through the orchestrator. No-ops when unconfigured. | Optional |
 | **Azure Cache for Redis** | `backend/cache.py` | Response caching / rate-limit backing. Falls back silently when unavailable. | Optional |
-| **Microsoft Graph API** (Planner + Teams) | `backend/m365.py` | Pushes tasks to **Microsoft Planner** and posts summaries to **Microsoft Teams** channels. | Optional |
+| **Microsoft Graph API** (Planner + Teams + Outlook) | `backend/m365.py` | Pushes tasks to **Microsoft Planner**, posts summaries to **Microsoft Teams** channels, and creates **Outlook calendar** deadline reminders. | Optional |
 | **Microsoft Entra ID** (Azure AD, OAuth 2.0 client-credentials) | `backend/m365.py` | Issues the Graph API access token (`login.microsoftonline.com` token endpoint). | Optional |
 | **Azure Container Registry + Azure Container Apps** | `infra/` (Bicep) | Reference container-based deployment target provisioned by the IaC templates. | IaC (reference) |
 | **Azure Bicep** (Infrastructure as Code) | `infra/main.bicep`, `infra/modules/` | Declarative provisioning of Cosmos DB, ACR, Container Apps, and Service Bus. | IaC |
@@ -235,6 +235,7 @@ Frontend: `NEXT_PUBLIC_API_URL` (build-time) points the UI at the backend.
 | `GET` | `/api/sessions` | List all sessions |
 | `POST` | `/api/export/planner` | Push tasks to Microsoft Planner |
 | `POST` | `/api/export/teams` | Post a summary to Microsoft Teams |
+| `POST` | `/api/export/outlook` | Create Outlook calendar reminders for task deadlines |
 | `POST` | `/api/export/pdf` | Export the report as Markdown |
 
 Interactive docs: https://workflowos-api.azurewebsites.net/docs
