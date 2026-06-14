@@ -11,23 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set Azure config (clear Oryx cache, enable run-from-package)
+      - name: Clear stale Oryx build artifacts (best effort)
         continue-on-error: true
         shell: bash
+        env:
+          PP: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         run: |
-          set -e
-          PP="${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}"
-          USER=$(echo "$PP" | sed -n 's/.*userName="\([^"]*\)".*/\1/p')
-          PASS=$(echo "$PP" | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p')
-          if [ -n "$USER" ] && [ -n "$PASS" ]; then
-            BASE="https://workflowos-api.scm.azurewebsites.net"
-            for f in /site/wwwroot/oryx-manifest.toml /site/wwwroot/output.tar.zst; do
-              code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -u "$USER:$PASS" "$BASE/api/vfs$f" || true)
-              echo "DELETE $f → $code"
-            done
-          else
-            echo "Could not extract credentials; skipping cache clear"
+          set -uo pipefail
+          USER=$(echo "$PP" | sed -n 's/.*userName="\([^"]*\)".*/\1/p' | head -1)
+          PASS=$(echo "$PP" | sed -n 's/.*userPWD="\([^"]*\)".*/\1/p' | head -1)
+          if [ -z "$USER" ] || [ -z "$PASS" ]; then
+            echo "Could not read SCM creds; the deploy step will overwrite the tarball anyway."
+            exit 0
           fi
+          BASE="https://workflowos-api.scm.azurewebsites.net"
+          for f in /site/wwwroot/oryx-manifest.toml /site/wwwroot/output.tar.zst /site/wwwroot/output.tar.gz; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -u "$USER:$PASS" "$BASE/api/vfs$f" || true)
+            echo "DELETE $f -> $code"
+          done
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
@@ -35,3 +36,4 @@ jobs:
           app-name: workflowos-api
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: backend
+          startup-command: 'python -m uvicorn main:app --host 0.0.0.0 --port 8000'
