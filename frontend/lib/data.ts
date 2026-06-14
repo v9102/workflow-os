@@ -7,6 +7,22 @@ export interface PresetMeeting {
   plan: ParsedPlan;
 }
 
+// A complete, multi-speaker sample transcript that exercises the full agent
+// swarm (Extraction → Risk → Assignment → Reporting → Validation): explicit
+// owners, deadlines, a dependency, and a stated risk.
+export const SAMPLE_TRANSCRIPT = `Sarah: Morning everyone, let's plan the v2 launch sprint. We have three weeks.
+Raj: I'll take the payments integration with Stripe. That's the critical path — it needs to be done before we can start the checkout redesign.
+Sarah: Good. When can you have it ready?
+Raj: Payments should be done by next Friday. There's a risk though — Stripe's webhook signing changed in their latest API version, so we may need extra time to handle the migration.
+Priya: I'll own the checkout redesign. I can start once Raj's payments work lands, so probably the week after.
+Sarah: Perfect. Tom, can you handle the load testing?
+Tom: Yes, I'll set up load testing. I need the staging environment first though — that's blocking me.
+Sarah: I'll get DevOps to provision staging by Wednesday. Let's also make sure we write the migration docs before launch.
+Priya: I can draft the migration docs by end of sprint.
+Sarah: Great, that's our plan.`
+
+export const SAMPLE_MEETING_ID = 'Sample_Sprint_V2'
+
 export const PRESET_MEETINGS: PresetMeeting[] = [
   {
     id: 'Meeting_ID_4920',

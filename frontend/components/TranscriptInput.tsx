@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { FileText, Upload, Link as LinkIcon, Sparkles, Cpu } from "lucide-react"
+import { FileText, Upload, Link as LinkIcon, Sparkles, Cpu, FileText as FileTextIcon } from "lucide-react"
 import { motion } from "motion/react"
-import { PRESET_MEETINGS } from "@/lib/data"
+import { PRESET_MEETINGS, SAMPLE_TRANSCRIPT, SAMPLE_MEETING_ID } from "@/lib/data"
 
 interface TranscriptInputProps {
   transcript: string
@@ -20,6 +20,11 @@ export function TranscriptInput({ transcript, setTranscript, meetingId, setMeeti
   const applyPreset = (presetObj: typeof PRESET_MEETINGS[0]) => {
     setTranscript(presetObj.transcript)
     setMeetingId(presetObj.id)
+  }
+
+  const loadSample = () => {
+    setTranscript(SAMPLE_TRANSCRIPT)
+    setMeetingId(SAMPLE_MEETING_ID)
   }
 
   return (
@@ -86,6 +91,11 @@ export function TranscriptInput({ transcript, setTranscript, meetingId, setMeeti
             <button className="flex items-center gap-1.5 hover:opacity-50 transition-opacity text-[10px] uppercase tracking-widest font-bold text-stone-700 dark:text-stone-400" onClick={() => alert('Connect Slack, Teams, Google Drive or Zoom integrations to auto extract.')}>
               <LinkIcon className="w-3.5 h-3.5" />
               <span>Connect Integration</span>
+            </button>
+            <div className="w-px h-3.5 bg-[#1A1A1A]/10 dark:bg-[#EAE6DF]/15"></div>
+            <button className="flex items-center gap-1.5 hover:opacity-50 transition-opacity text-[10px] uppercase tracking-widest font-bold text-stone-700 dark:text-stone-400" onClick={loadSample} disabled={isProcessing}>
+              <FileTextIcon className="w-3.5 h-3.5" />
+              <span>Load Sample</span>
             </button>
           </div>
 
