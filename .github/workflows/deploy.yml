@@ -25,8 +25,11 @@ jobs:
             exit 0
           fi
           BASE="https://workflowos-api.scm.azurewebsites.net"
-          for f in /site/wwwroot/oryx-manifest.toml /site/wwwroot/output.tar.zst /site/wwwroot/output.tar.gz; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -u "$USER:$PASS" "$BASE/api/vfs$f" || true)
+          # Kudu VFS deletes REQUIRE an If-Match header — without it you get 409/412
+          # and the stale tarball survives. Remove the previous build's tarball so
+          # Oryx can't extract old code; the deploy step writes a fresh one.
+          for f in /site/wwwroot/output.tar.zst /site/wwwroot/output.tar.gz; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "If-Match: *" -u "$USER:$PASS" "$BASE/api/vfs$f" || true)
             echo "DELETE $f -> $code"
           done
 
